@@ -1,0 +1,6 @@
+[submodule "third_party/Catch2"]
+	path = third_party/Catch2
+	url = https://github.com/catchorg/Catch2.git
+[submodule "third_party/STM32CubeG4"]
+	path = third_party/STM32CubeG4
+	url = https://github.com/STMicroelectronics/STM32CubeG4.git
