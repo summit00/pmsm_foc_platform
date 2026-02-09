@@ -1,6 +1,11 @@
 add_executable(${PROJECT_NAME}.elf)
 
 set(CUBE_DIR ${CMAKE_SOURCE_DIR}/cubeMx)
+set(CUBE_SUBMODULE_DIR ${CMAKE_SOURCE_DIR}/third_party/STM32CubeG4)
+
+if(NOT EXISTS ${CUBE_SUBMODULE_DIR}/DRIVERS)
+  message(FATAL_ERROR "STM32CubeG4 submodule not found. Please run:\n  git submodule update --init --recursive")
+endif()
 
 # STM32G431 = Cortex-M4F
 set(MCU_FLAGS 
@@ -24,10 +29,10 @@ target_link_options(${PROJECT_NAME}.elf PRIVATE
 
 target_include_directories(${PROJECT_NAME}.elf PRIVATE
   ${CUBE_DIR}/Core/Inc
-  ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Inc
-  ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Inc/Legacy
-  ${CUBE_DIR}/Drivers/CMSIS/Device/ST/STM32G4xx/Include
-  ${CUBE_DIR}/Drivers/CMSIS/Include
+  ${CUBE_SUBMODULE_DIR}/Drivers/STM32G4xx_HAL_Driver/Inc
+  ${CUBE_SUBMODULE_DIR}/Drivers/STM32G4xx_HAL_Driver/Inc/Legacy
+  ${CUBE_SUBMODULE_DIR}/Drivers/CMSIS/Device/ST/STM32G4xx/Include
+  ${CUBE_SUBMODULE_DIR}/Drivers/CMSIS/Include
 
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
@@ -51,15 +56,15 @@ set(CUBE_SOURCES
 
 # Minimal HAL driver sources for GPIO + clocks + SysTick
 set(HAL_SOURCES
-  ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal.c
-  ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc.c
-  ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc_ex.c
-  ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_gpio.c
-  ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash.c
-  ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash_ex.c
-  ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr.c
-  ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr_ex.c
-  ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_cortex.c
+  ${CUBE_SUBMODULE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal.c
+  ${CUBE_SUBMODULE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc.c
+  ${CUBE_SUBMODULE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc_ex.c
+  ${CUBE_SUBMODULE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_gpio.c
+  ${CUBE_SUBMODULE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash.c
+  ${CUBE_SUBMODULE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash_ex.c
+  ${CUBE_SUBMODULE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr.c
+  ${CUBE_SUBMODULE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr_ex.c
+  ${CUBE_SUBMODULE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_cortex.c
 )
 
 target_sources(${PROJECT_NAME}.elf PRIVATE

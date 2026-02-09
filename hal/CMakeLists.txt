@@ -4,16 +4,21 @@ add_library(hal_impl STATIC
 )
 
 set(CUBE_DIR ${CMAKE_SOURCE_DIR}/cubeMx)
+set(CUBE_SUBMODULE_DIR ${CMAKE_SOURCE_DIR}/third_party/STM32CubeG4)
+
+if(NOT EXISTS ${CUBE_SUBMODULE_DIR}/DRIVERS)
+  message(FATAL_ERROR "STM32CubeG4 submodule not found. Please run:\n  git submodule update --init --recursive")
+endif()
 
 target_include_directories(hal_impl PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${CMAKE_SOURCE_DIR}/app/include
 
   ${CUBE_DIR}/Core/Inc
-  ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Inc
-  ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Inc/Legacy
-  ${CUBE_DIR}/Drivers/CMSIS/Device/ST/STM32G4xx/Include
-  ${CUBE_DIR}/Drivers/CMSIS/Include
+  ${CUBE_SUBMODULE_DIR}/Drivers/STM32G4xx_HAL_Driver/Inc
+  ${CUBE_SUBMODULE_DIR}/Drivers/STM32G4xx_HAL_Driver/Inc/Legacy
+  ${CUBE_SUBMODULE_DIR}/Drivers/CMSIS/Device/ST/STM32G4xx/Include
+  ${CUBE_SUBMODULE_DIR}/Drivers/CMSIS/Include
 )
 
 target_compile_definitions(hal_impl PUBLIC
