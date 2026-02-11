@@ -2,6 +2,12 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Delete build Folder",
+      "type": "shell",
+      "command": "Remove-Item -Recurse -Force ./build",
+      "problemMatcher": [],
+    },
+    {
       "label": "cmake: configure",
       "type": "shell",
       "command": "cmake",
