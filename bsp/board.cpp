@@ -1,4 +1,4 @@
-#include "bsp/board.hpp"
+#include "board.hpp"
 #include "stm32g4xx_hal.h"
 
 namespace bsp {
