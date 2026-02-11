@@ -6,7 +6,7 @@ set(CUBE_DIR ${CMAKE_SOURCE_DIR}/cubeMx)
 
 target_include_directories(bsp_board PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
-  ${CMAKE_SOURCE_DIR}/app/include
+  ${CMAKE_SOURCE_DIR}/app
   ${CUBE_DIR}/Core/Inc
   ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Inc
   ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Inc/Legacy

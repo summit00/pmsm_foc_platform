@@ -1,6 +1,6 @@
 #pragma once
 #include <cstdint>
-#include "app/interfaces.hpp"
+#include "interfaces.hpp"
 
 namespace app {
 

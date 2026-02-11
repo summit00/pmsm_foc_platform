@@ -3,7 +3,7 @@
 
 #include "platform/system_clock.hpp"
 
-#include "app/heartbeat.hpp"
+#include "heartbeat.hpp"
 #include "hal/tick_hal.hpp"
 #include "hal/gpio_out_hal.hpp"
 #include "bsp/board.hpp"

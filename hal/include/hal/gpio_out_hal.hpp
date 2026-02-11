@@ -1,6 +1,6 @@
 #pragma once
 #include <cstdint>
-#include "app/interfaces.hpp"
+#include "interfaces.hpp"
 #include "stm32g4xx_hal.h"
 
 //struct GPIO_TypeDef;
