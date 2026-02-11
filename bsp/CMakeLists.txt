@@ -1,10 +1,9 @@
-add_library(bsp_board STATIC
-  board.cpp
+add_library(bsp_board INTERFACE
 )
 
 set(CUBE_DIR ${CMAKE_SOURCE_DIR}/cubeMx)
 
-target_include_directories(bsp_board PUBLIC
+target_include_directories(bsp_board INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_SOURCE_DIR}/app
   ${CUBE_DIR}/Core/Inc
@@ -14,11 +13,11 @@ target_include_directories(bsp_board PUBLIC
   ${CUBE_DIR}/Drivers/CMSIS/Include
 )
 
-target_compile_definitions(bsp_board PUBLIC
+target_compile_definitions(bsp_board INTERFACE
   STM32G431xx
   USE_HAL_DRIVER
 )
 
-target_link_libraries(bsp_board PUBLIC
+target_link_libraries(bsp_board INTERFACE
   stm32_mcu
 )

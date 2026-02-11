@@ -1,4 +1,4 @@
-#include "platform/system_clock.hpp"
+#include "system_clock.hpp"
 #include "stm32g4xx_hal.h"
 
 extern "C" void SystemClock_Config(void)

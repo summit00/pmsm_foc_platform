@@ -34,7 +34,8 @@ target_include_directories(${PROJECT_NAME}.elf PRIVATE
   ${CUBE_SUBMODULE_DIR}/Drivers/CMSIS/Device/ST/STM32G4xx/Include
   ${CUBE_SUBMODULE_DIR}/Drivers/CMSIS/Include
 
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/stm32G431
+  ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 target_compile_definitions(${PROJECT_NAME}.elf PRIVATE
@@ -71,9 +72,9 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
   ${CUBE_SOURCES}
   ${HAL_SOURCES}
   ${STARTUP_FILE}
-  src/main.cpp
-  src/system_clock.cpp
-  src/irq_handler.cpp
+  stm32G431/main.cpp
+  system_clock.cpp
+  irq_handler.cpp
 )
 
 target_link_options(${PROJECT_NAME}.elf PRIVATE
