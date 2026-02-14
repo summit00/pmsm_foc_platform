@@ -61,7 +61,7 @@
         "-c",
         "port=SWD",
         "-w",
-        "${workspaceFolder}\\build\\platform\\stm32_cMake_build_system.elf",
+        "${workspaceFolder}\\build\\platform\\pmsm_foc_platform.elf",
         "-v",
         "-rst"
       ],

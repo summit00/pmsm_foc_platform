@@ -1,0 +1,18 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug STM32G431",
+      "type": "cortex-debug",
+      "request": "launch",
+      "servertype": "stlink",
+      "cwd": "${workspaceFolder}",
+      "executable": "${workspaceFolder}/build/platform/pmsm_foc_platform.elf",
+      "gdbPath": "C:\\Arm\\13.3 rel1\\bin\\arm-none-eabi-gdb.exe", 
+      "preLaunchTask": "cmake: build",
+      "runToMain": true,
+      "device": "STM32G431",
+      "svdFile": "${workspaceFolder}/STM32G431.svd"
+    }
+  ]
+}
