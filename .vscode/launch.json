@@ -8,11 +8,18 @@
       "servertype": "stlink",
       "cwd": "${workspaceFolder}",
       "executable": "${workspaceFolder}/build/platform/pmsm_foc_platform.elf",
-      "gdbPath": "C:\\Arm\\13.3 rel1\\bin\\arm-none-eabi-gdb.exe", 
+      "gdbPath": "C:\\Arm\\13.3 rel1\\bin\\arm-none-eabi-gdb.exe",
       "preLaunchTask": "cmake: build",
       "runToMain": true,
       "device": "STM32G431",
-      "svdFile": "${workspaceFolder}/STM32G431.svd"
+      "svdFile": "${workspaceFolder}/STM32G431.svd",
+
+      "interface": "swd",
+
+      "liveWatch": {
+        "enabled": true,
+        "samplesPerSecond": 4
+      }
     }
   ]
 }
