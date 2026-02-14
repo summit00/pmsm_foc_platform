@@ -5,7 +5,7 @@
 #include "heartbeat.hpp"
 #include "tick_hal.hpp"
 #include "gpio_out_hal.hpp"
-#include "board.hpp"
+#include "bsp.hpp"
 
 namespace app {
 

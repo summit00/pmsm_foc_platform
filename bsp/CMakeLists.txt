@@ -4,7 +4,7 @@ add_library(bsp_board INTERFACE
 set(CUBE_DIR ${CMAKE_SOURCE_DIR}/cubeMx)
 
 target_include_directories(bsp_board INTERFACE
-  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/G431
   ${CMAKE_SOURCE_DIR}/app
   ${CUBE_DIR}/Core/Inc
   ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Inc
