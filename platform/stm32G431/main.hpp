@@ -1,11 +1,19 @@
 #pragma once
 #include "stm32g4xx_hal.h"
 #include "gpio.h"
-#include "system_clock.hpp"
 #include "heartbeat.hpp"
 #include "tick_hal.hpp"
 #include "gpio_out_hal.hpp"
 #include "bsp.hpp"
+extern "C" {
+    void SystemClock_Config(void);
+    void MX_GPIO_Init(void);
+    // Add others as you enable them in CubeMX
+}
+extern "C" {
+#include "system_stm32g4xx.h" // CubeMX clock
+#include "gpio.h"             // CubeMX GPIO init
+}
 
 namespace app {
 

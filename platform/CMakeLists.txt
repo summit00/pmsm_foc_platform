@@ -30,6 +30,7 @@ target_include_directories(${PROJECT_NAME}.elf PRIVATE
   ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Inc/Legacy
   ${CUBE_DIR}/Drivers/CMSIS/Device/ST/STM32G4xx/Include
   ${CUBE_DIR}/Drivers/CMSIS/Include
+  ${CUBE_DIR}/Drivers/BSP/STM32G4xx_Nucleo
 
   ${CMAKE_CURRENT_SOURCE_DIR}/stm32G431
   ${CMAKE_CURRENT_SOURCE_DIR}
@@ -54,6 +55,8 @@ set(CUBE_SOURCES
 
 # Minimal HAL driver sources for GPIO + clocks + SysTick
 set(HAL_SOURCES
+  ${CUBE_DIR}/Core/Src/main.c
+  ${CUBE_DIR}/Core/Src/system_stm32g4xx.c
   ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal.c
   ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc.c
   ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc_ex.c
@@ -69,9 +72,8 @@ target_sources(${PROJECT_NAME}.elf PRIVATE
   ${CUBE_SOURCES}
   ${HAL_SOURCES}
   ${STARTUP_FILE}
-  stm32G431/main.cpp
-  system_clock.cpp
-  irq_handler.cpp
+  stm32g431/main.cpp
+  stm32g431/irq_handler.cpp
 )
 
 target_link_options(${PROJECT_NAME}.elf PRIVATE

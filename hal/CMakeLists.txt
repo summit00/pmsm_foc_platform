@@ -3,7 +3,7 @@ add_library(hal_impl INTERFACE)
 set(CUBE_DIR ${CMAKE_SOURCE_DIR}/cubeMx)
 
 target_include_directories(hal_impl INTERFACE
-  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/stm32g431
   ${CMAKE_SOURCE_DIR}/app
 
   ${CUBE_DIR}/Core/Inc

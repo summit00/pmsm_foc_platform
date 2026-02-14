@@ -1,4 +1,4 @@
- {
+{
   "version": "2.0.0",
   "tasks": [
     {
@@ -58,15 +58,18 @@
       "type": "shell",
       "command": "C:\\Program Files\\STMicroelectronics\\STM32Cube\\STM32CubeProgrammer\\bin\\STM32_Programmer_CLI.exe",
       "args": [
-        "-c", "port=SWD",
-        "-w", "${workspaceFolder}\\build\\platform\\stm32_cMake_build_system.elf",
+        "-c",
+        "port=SWD",
+        "-w",
+        "${workspaceFolder}\\build\\platform\\stm32_cMake_build_system.elf",
         "-v",
         "-rst"
       ],
       "problemMatcher": [],
-      "dependsOn": ["cmake: build"],
+      "dependsOn": [
+        "cmake: build"
+      ],
       "group": "build"
-
     }
   ]
 }
