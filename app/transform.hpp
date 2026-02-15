@@ -24,8 +24,6 @@ public:
     }
 
     static std::array<float,2> inversePark(const std::array<float,2>& dq, float theta) {
-        float alpha = dq[0] * std::cos(theta) - dq[1] * std::sin(theta);
-        float beta  = dq[0] * std::sin(theta) + dq[1] * std::cos(theta);
-        return {alpha, beta};
+        return park({dq[0], dq[1]}, -theta);
     }
 };

@@ -6,7 +6,7 @@ project(pmsm_foc_platform LANGUAGES C CXX ASM)
 add_definitions(-DUSE_NUCLEO_64)
 
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(PLATFORM "stm32" CACHE STRING "Build platform: host|stm32")
