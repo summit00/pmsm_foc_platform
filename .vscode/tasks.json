@@ -70,6 +70,32 @@
         "cmake: build"
       ],
       "group": "build"
+    },
+    {
+      "label": "tests: configure",
+      "type": "shell",
+      "command": "cmake -S . -B build-host -G Ninja -DPLATFORM=host -DBUILD_TESTS=ON",
+      "problemMatcher": []
+    },
+    {
+      "label": "tests: build (host)",
+      "type": "shell",
+      "command": "cmake --build build-host",
+      "dependsOn": [
+        "tests: configure (host)"
+      ],
+      "problemMatcher": [
+        "$gcc"
+      ]
+    },
+    {
+      "label": "tests: run (host)",
+      "type": "shell",
+      "command": "ctest --test-dir build-host --output-on-failure",
+      "dependsOn": [
+        "tests: build (host)"
+      ],
+      "problemMatcher": []
     }
   ]
 }
