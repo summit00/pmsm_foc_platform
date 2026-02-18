@@ -1,7 +1,6 @@
 add_executable(${PROJECT_NAME}.elf)
 
 set(CUBE_DIR ${CMAKE_SOURCE_DIR}/cubeMx)
-set(CUBE_SUBMODULE_DIR ${CMAKE_SOURCE_DIR}/third_party/STM32CubeG4)
 
 
 # STM32G431 = Cortex-M4F
@@ -48,6 +47,8 @@ set(LINKER_SCRIPT ${CUBE_DIR}/STM32G431xx_FLASH.ld)
 # CubeMX sources (NO Cube main.c; platform owns main())
 set(CUBE_SOURCES
   ${CUBE_DIR}/Core/Src/gpio.c
+  ${CUBE_DIR}/Core/Src/adc.c
+  ${CUBE_DIR}/Core/Src/tim.c
   #${CUBE_DIR}/Core/Src/stm32g4xx_it.c
   ${CUBE_DIR}/Core/Src/stm32g4xx_hal_msp.c
   ${CUBE_DIR}/Core/Src/system_stm32g4xx.c
@@ -58,6 +59,10 @@ set(HAL_SOURCES
   ${CUBE_DIR}/Core/Src/main.c
   ${CUBE_DIR}/Core/Src/system_stm32g4xx.c
   ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal.c
+  ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_adc.c
+  ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_adc_ex.c
+  ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_tim.c
+  ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_tim_ex.c
   ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc.c
   ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc_ex.c
   ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_gpio.c
