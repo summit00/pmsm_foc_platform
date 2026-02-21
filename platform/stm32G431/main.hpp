@@ -1,36 +1,49 @@
 #pragma once
-#include "stm32g4xx_hal.h"
-#include "gpio.h"
-#include "heartbeat.hpp"
-#include "tick_hal.hpp"
-#include "gpio_out_hal.hpp"
 #include "bsp.hpp"
+#include "gpio.h"
+#include "gpio_out_hal.hpp"
+#include "heartbeat.hpp"
+#include "stm32g4xx_hal.h"
+#include "tick_hal.hpp"
+#include <stdint>
 
-extern "C" {
-#include "system_stm32g4xx.h" // CubeMX clock
-#include "gpio.h"             // CubeMX GPIO init
+// UART commands + telemetry
+#include "uart_link.hpp"
+
+extern "C"
+{
 #include "adc.h"
+#include "dma.h"
+#include "gpio.h"             // CubeMX GPIO init
+#include "system_stm32g4xx.h" // CubeMX clock
 #include "tim.h"
+#include "usart.h"
 }
 
-extern "C" {
+extern "C"
+{
     void SystemClock_Config(void);
     void MX_GPIO_Init(void);
+    void MX_DMA_Init(void);
+    void MX_USART2_UART_Init(void);
     void MX_TIM1_Init(void);
     void MX_ADC1_Init(void);
     void MX_ADC2_Init(void);
 }
 
-extern "C" {
+extern "C"
+{
     extern TIM_HandleTypeDef htim1;
     extern ADC_HandleTypeDef hadc1;
     extern ADC_HandleTypeDef hadc2;
 }
 
-namespace app {
+namespace app
+{
 
 // This struct holds all your hardware modules
-struct MainApp {
+struct MainApp
+{
     // HAL tick module
     hal::TickHal tick;
 
@@ -42,15 +55,16 @@ struct MainApp {
 
     // Constructor sets up everything
     MainApp()
-        : led(bsp::status_led().port, bsp::status_led().pin),
-          hb(500)  // 500ms heartbeat period
+        : led(bsp::status_led().port, bsp::status_led().pin), hb(500) // 500ms heartbeat period
     {
         HAL_Init();
         SystemClock_Config();
+        MX_DMA_Init();
         MX_GPIO_Init(); // CubeMX GPIO init
-        MX_TIM1_Init();  // CubeMX Timer init
-        MX_ADC1_Init();  // CubeMX ADC1 init
-        MX_ADC2_Init();  // CubeMX ADC2 init
+        MX_USART2_UART_Init();
+        MX_TIM1_Init(); // CubeMX Timer init
+        MX_ADC1_Init(); // CubeMX ADC1 init
+        MX_ADC2_Init(); // CubeMX ADC2 init
 
         HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
         HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED);
@@ -64,16 +78,34 @@ struct MainApp {
 
         HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4); // Start PWM for ADC triggering
 
+        // UART link (commands + telemetry)
+        platform::uart_init();
+
         // Initialize heartbeat
-        //hb.start(tick);
+        // hb.start(tick);
     }
 
     // Run the main loop
-    void loop() {
-        while (true) {
-            //hb.update(tick, led);
+    void loop()
+    {
+        static uint32_t last_telem_ms = 0;
+        while (true)
+        {
+            // Process one completed command line (if any)
+            platform::process_line();
+
+            // Send telemetry at 500 Hz (every 2ms). Adjust as needed.
+            uint32_t now = HAL_GetTick();
+            if ((now - last_telem_ms) >= 2)
+            {
+                last_telem_ms = now;
+                platform::telemetry_try_send();
+            }
+
+            // Optional: heartbeat LED in background
+            // hb.update(tick, led);
         }
     }
 };
 
-}
+} // namespace app

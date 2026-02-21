@@ -49,6 +49,8 @@ set(CUBE_SOURCES
   ${CUBE_DIR}/Core/Src/gpio.c
   ${CUBE_DIR}/Core/Src/adc.c
   ${CUBE_DIR}/Core/Src/tim.c
+  ${CUBE_DIR}/Core/Src/dma.c
+  ${CUBE_DIR}/Core/Src/usart.c
   #${CUBE_DIR}/Core/Src/stm32g4xx_it.c
   ${CUBE_DIR}/Core/Src/stm32g4xx_hal_msp.c
   ${CUBE_DIR}/Core/Src/system_stm32g4xx.c
@@ -63,6 +65,9 @@ set(HAL_SOURCES
   ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_adc_ex.c
   ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_tim.c
   ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_tim_ex.c
+  ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_uart.c
+  ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_uart_ex.c
+  ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_dma.c
   ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc.c
   ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc_ex.c
   ${CUBE_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_gpio.c
