@@ -5,7 +5,6 @@
 #include "heartbeat.hpp"
 #include "stm32g4xx_hal.h"
 #include "tick_hal.hpp"
-#include <stdint>
 
 // UART commands + telemetry
 #include "uart_link.hpp"
@@ -65,6 +64,11 @@ struct MainApp
         MX_TIM1_Init(); // CubeMX Timer init
         MX_ADC1_Init(); // CubeMX ADC1 init
         MX_ADC2_Init(); // CubeMX ADC2 init
+
+        // Set IRQ Priorities
+        HAL_NVIC_SetPriority(ADC1_2_IRQn, 0, 0);
+        HAL_NVIC_SetPriority(USART2_IRQn, 5, 0);
+        HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 6, 0);
 
         HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
         HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED);
