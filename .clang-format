@@ -1,0 +1,28 @@
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+# Indentation and Column Limit
+IndentWidth: 4
+ColumnLimit: 100
+UseTab: Never
+
+# Brace Wrapping (Allman style - braces on new lines)
+BreakBeforeBraces: Allman
+
+# Pointer Alignment (int* ptr instead of int *ptr)
+PointerAlignment: Left
+
+# Alignment of parameters and arguments
+AlignAfterOpenBracket: Align
+BinPackArguments: false
+BinPackParameters: false
+
+# Miscellaneous
+AllowShortFunctionsOnASingleLine: None
+IndentCaseLabels: true
+SortIncludes: true
+
+# Keep headers grouped
+IncludeBlocks: Preserve
+---
