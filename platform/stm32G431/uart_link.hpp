@@ -3,6 +3,8 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "interfaces.hpp"
+
 extern "C"
 {
 #include "usart.h"
@@ -14,15 +16,7 @@ namespace platform
 // ======================================================
 // ===================== COMMAND STATE ==================
 // ======================================================
-
-struct ControlInputs
-{
-    volatile uint8_t enable = 0;
-    volatile int32_t target_speed_rpm = 0;
-    volatile int32_t max_current_mA = 0;
-};
-
-inline ControlInputs g_cmd;
+inline volatile app::ControlInputs g_cmd = {0, 0, 0, 0};
 
 // ======================================================
 // ===================== TELEMETRY ======================
@@ -49,6 +43,24 @@ inline void telemetry_snapshot_into(TelemetryPacket& dst)
     {
         dst.v[i] = g_telem.v[i];
     }
+}
+
+inline void cmd_set_enable(uint8_t enable)
+{
+    g_cmd.enable = enable;
+    g_cmd.seq++;
+}
+
+inline void cmd_set_target_speed(int32_t rpm)
+{
+    g_cmd.target_speed_rpm = rpm;
+    g_cmd.seq++;
+}
+
+inline void cmd_set_max_current(int32_t maxCurrent_mA)
+{
+    g_cmd.max_current_mA = maxCurrent_mA;
+    g_cmd.seq++;
 }
 
 // ======================================================
@@ -131,19 +143,19 @@ inline void process_line()
     {
         char* v = std::strtok(nullptr, " \r\n");
         if (v)
-            g_cmd.enable = static_cast<uint8_t>(std::atoi(v));
+            cmd_set_enable(static_cast<uint8_t>(std::atoi(v)));
     }
     else if (std::strcmp(cmd, "spd") == 0)
     {
         char* v = std::strtok(nullptr, " \r\n");
         if (v)
-            g_cmd.target_speed_rpm = std::atoi(v);
+            cmd_set_target_speed(std::atoi(v));
     }
     else if (std::strcmp(cmd, "imax") == 0)
     {
         char* v = std::strtok(nullptr, " \r\n");
         if (v)
-            g_cmd.max_current_mA = std::atoi(v);
+            cmd_set_max_current(std::atoi(v));
     }
     else if (std::strcmp(cmd, "help") == 0)
     {

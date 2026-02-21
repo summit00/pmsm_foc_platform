@@ -5,6 +5,7 @@
 #include "dma.h"
 #include "usart.h"
 
+#include "motor_run.hpp"
 #include "uart_link.hpp"
 
 extern "C"
@@ -47,14 +48,8 @@ extern "C" void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         uint16_t adc1_injected_value = HAL_ADCEx_InjectedGetValue(&hadc1, ADC_INJECTED_RANK_1);
         uint16_t adc2_injected_value = HAL_ADCEx_InjectedGetValue(&hadc2, ADC_INJECTED_RANK_1);
 
-        // Minimal demo telemetry: stream raw current ADC counts.
-        // Later you will replace this with id/iq/omega etc.
-        platform::g_telem.counter++;
-        platform::g_telem.v[0] = (int16_t)adc1_injected_value;
-        platform::g_telem.v[1] = (int16_t)adc2_injected_value;
-        platform::g_telem.v[2] = (int16_t)platform::g_cmd.max_current_mA;   // debug
-        platform::g_telem.v[3] = (int16_t)platform::g_cmd.target_speed_rpm; // debug
-        platform::g_telem.v[4] = (int16_t)platform::g_cmd.enable;           // debug
+        platform::current_sense.isr_update_currents(adc1_injected_value, adc2_injected_value);
+        platform::motor_control_isr();
 
         static uint16_t irq_counter = 0;
 
