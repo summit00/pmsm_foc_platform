@@ -51,4 +51,18 @@ class IControlInputs
     virtual ControlInputs read() const = 0;
 };
 
+struct PhaseVoltages
+{
+    float va_V;
+    float vb_V;
+    float vc_V;
+};
+
+class IInverter
+{
+  public:
+    virtual ~IInverter() = default;
+    virtual void set_phase_voltages(const PhaseVoltages& voltages, float vbus_V) = 0;
+};
+
 } // namespace app

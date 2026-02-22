@@ -5,7 +5,7 @@
 #include "dma.h"
 #include "usart.h"
 
-#include "motor_run.hpp"
+#include "foc_runner.hpp"
 #include "uart_link.hpp"
 
 extern "C"
