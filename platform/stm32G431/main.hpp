@@ -81,6 +81,9 @@ struct MainApp
         __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, sample);
 
         HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4); // Start PWM for ADC triggering
+        HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+        HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
+        HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
 
         // UART link (commands + telemetry)
         platform::uart_init();
@@ -95,7 +98,7 @@ struct MainApp
         static uint32_t last_telem_ms = 0;
         while (true)
         {
-            // Process one completed command line (if any)
+            platform::check_for_rx_data();
             platform::process_line();
 
             // Send telemetry at 500 Hz (every 2ms). Adjust as needed.

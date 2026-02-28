@@ -89,16 +89,18 @@ inline void on_uart_tx_done()
 // ======================================================
 // ===================== RX (INT 1 BYTE) =================
 // ======================================================
-
-inline volatile uint8_t g_rx_byte = 0;
-
 inline char g_line[96];
 inline uint32_t g_line_len = 0;
 inline volatile uint8_t g_line_ready = 0;
 
+#define RX_DMA_BUF_SIZE 256
+inline uint8_t g_rx_dma_buf[RX_DMA_BUF_SIZE];
+inline uint32_t g_rd_ptr = 0; // Tracks processed data position
+
 inline void uart_init()
 {
-    HAL_UART_Receive_IT(&huart2, (uint8_t*)&g_rx_byte, 1);
+    // Start DMA in circular mode once
+    HAL_UART_Receive_DMA(&huart2, g_rx_dma_buf, RX_DMA_BUF_SIZE);
 }
 
 inline void on_uart_rx_byte(uint8_t b)
@@ -161,6 +163,23 @@ inline void process_line()
     {
         const char msg[] = "cmd: en 0|1, spd <rpm>, imax <mA>\r\n";
         HAL_UART_Transmit(&huart2, (uint8_t*)msg, sizeof(msg) - 1, 20);
+    }
+}
+
+inline void check_for_rx_data()
+{
+    // Calculate current write position from DMA CNDTR register
+    // CNDTR counts DOWN from RX_DMA_BUF_SIZE to 0
+    uint32_t curr_wr_ptr = RX_DMA_BUF_SIZE - __HAL_DMA_GET_COUNTER(huart2.hdmarx);
+
+    while (g_rd_ptr != curr_wr_ptr)
+    {
+        uint8_t b = g_rx_dma_buf[g_rd_ptr];
+
+        // Use your existing logic to parse lines
+        on_uart_rx_byte(b);
+
+        g_rd_ptr = (g_rd_ptr + 1) % RX_DMA_BUF_SIZE;
     }
 }
 

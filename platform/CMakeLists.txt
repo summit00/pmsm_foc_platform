@@ -9,6 +9,7 @@ set(MCU_FLAGS
   -mthumb
   -mfpu=fpv4-sp-d16 
   -mfloat-abi=hard
+  -O3
 )
 
 target_compile_options(${PROJECT_NAME}.elf PRIVATE

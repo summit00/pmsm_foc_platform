@@ -62,7 +62,7 @@ class IInverter
 {
   public:
     virtual ~IInverter() = default;
-    virtual void set_phase_voltages(const PhaseVoltages& voltages, float vbus_V) = 0;
+    virtual void set_phase_voltages(float va_V, float vb_V, float vc_V, float vbus_V) = 0;
 };
 
 } // namespace app

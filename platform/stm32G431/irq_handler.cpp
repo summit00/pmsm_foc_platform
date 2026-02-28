@@ -51,6 +51,20 @@ extern "C" void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         platform::current_sense.isr_update_currents(adc1_injected_value, adc2_injected_value);
         platform::motor_control_isr();
 
+        // if (app::FOC::is_enabled())
+        // {
+        // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_SET);
+        // HAL_GPIO_WritePin(GPIOC, GPIO_PIN_10, GPIO_PIN_SET);
+        // HAL_GPIO_WritePin(GPIOC, GPIO_PIN_11, GPIO_PIN_SET);
+        // HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_SET);
+        //}
+        // else
+        // {
+        //     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_10, GPIO_PIN_RESET);
+        //     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_11, GPIO_PIN_RESET);
+        //     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_RESET);
+        // }
+
         static uint16_t irq_counter = 0;
 
         if (++irq_counter >= 10000)
@@ -58,16 +72,6 @@ extern "C" void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
             irq_counter = 0;
             HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
         }
-    }
-}
-
-extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef* huart)
-{
-    if (huart == &huart2)
-    {
-        platform::on_uart_rx_byte(platform::g_rx_byte);
-        // re-arm RX
-        HAL_UART_Receive_IT(&huart2, (uint8_t*)&platform::g_rx_byte, 1);
     }
 }
 
