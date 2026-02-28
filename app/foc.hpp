@@ -14,9 +14,10 @@ class FOC
     explicit FOC(ICurrentSense& current_sense,
                  ITelemetry& telemetry,
                  IControlInputs& control_inputs,
-                 IInverter& inverter)
+                 IInverter& inverter,
+                 IEnableOutput& gate_enable)
         : current_sense(current_sense), telemetry(telemetry), control_inputs(control_inputs),
-          inverter(inverter)
+          inverter(inverter), gate_enable(gate_enable)
     {
     }
 
@@ -24,7 +25,22 @@ class FOC
     {
         PhaseCurrentsRaw currents = current_sense.read_raw();
         ControlInputs inputs = control_inputs.read();
-        isEnabled = inputs.enable;
+
+        bool newEnabled = inputs.enable;
+
+        if (newEnabled != isEnabled)
+        {
+            isEnabled = newEnabled;
+            gate_enable.set_enable(isEnabled);
+
+            if (!isEnabled)
+            {
+                m_currentRpm = 0.0f;
+                m_theta = 0.0f;
+                inverter.set_phase_voltages(0.0f, 0.0f, 0.0f, 24.0f);
+            }
+        }
+
         target_speed_rpm = inputs.target_speed_rpm;
         max_current_mA = inputs.max_current_mA;
 
@@ -79,8 +95,11 @@ class FOC
             setSamplingTime(1.0f / 20000.0f);
         }
 
-        telemetry.publish5_i16(
-            currents.ia_counts, currents.ib_counts, isEnabled, target_speed_rpm, m_currentRpm);
+        telemetry.publish5_i16(currents.ia_counts,
+                               currents.ib_counts,
+                               isEnabled * 1000,
+                               target_speed_rpm,
+                               m_currentRpm);
     }
 
     void setTarget(float targetRpm, float rampTime)
@@ -118,6 +137,7 @@ class FOC
     ITelemetry& telemetry;
     IControlInputs& control_inputs;
     IInverter& inverter;
+    IEnableOutput& gate_enable;
     // OpenLoopVf& open_loop_vf;
 
     bool isEnabled = false;

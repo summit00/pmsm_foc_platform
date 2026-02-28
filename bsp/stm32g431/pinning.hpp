@@ -23,5 +23,6 @@ inline constexpr GpioPin PA5{GPIOA, GPIO_PIN_5};
 inline constexpr GpioPin PC10{GPIOC, GPIO_PIN_10};
 inline constexpr GpioPin PC11{GPIOC, GPIO_PIN_11};
 inline constexpr GpioPin PC12{GPIOC, GPIO_PIN_12};
+inline constexpr GpioPin PA11{GPIOA, GPIO_PIN_11};
 
 } // namespace pinning

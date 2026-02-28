@@ -53,10 +53,7 @@ extern "C" void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 
         // if (app::FOC::is_enabled())
         // {
-        // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_SET);
-        // HAL_GPIO_WritePin(GPIOC, GPIO_PIN_10, GPIO_PIN_SET);
-        // HAL_GPIO_WritePin(GPIOC, GPIO_PIN_11, GPIO_PIN_SET);
-        // HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_SET);
+
         //}
         // else
         // {
@@ -65,13 +62,13 @@ extern "C" void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         //     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_RESET);
         // }
 
-        static uint16_t irq_counter = 0;
+        // static uint16_t irq_counter = 0;
 
-        if (++irq_counter >= 10000)
-        {
-            irq_counter = 0;
-            HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-        }
+        // if (++irq_counter >= 10000)
+        // {
+        //     irq_counter = 0;
+        //     HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+        // }
     }
 }
 

@@ -29,4 +29,9 @@ inline constexpr pinning::GpioPin powerstage_enable_c()
     return pinning::PC12;
 }
 
+inline constexpr pinning::GpioPin powerstage_enable_general()
+{
+    return pinning::PA11;
+}
+
 } // namespace bsp

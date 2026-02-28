@@ -65,4 +65,11 @@ class IInverter
     virtual void set_phase_voltages(float va_V, float vb_V, float vc_V, float vbus_V) = 0;
 };
 
+class IEnableOutput
+{
+  public:
+    virtual ~IEnableOutput() = default;
+    virtual void set_enable(bool enabled) = 0;
+};
+
 } // namespace app
