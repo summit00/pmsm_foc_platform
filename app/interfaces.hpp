@@ -72,4 +72,12 @@ class IEnableOutput
     virtual void set_enable(bool enabled) = 0;
 };
 
+class ICycleCounter
+{
+  public:
+    virtual ~ICycleCounter() = default;
+    virtual uint32_t now_cycles() const = 0;
+    virtual uint32_t cycles_per_second() const = 0;
+};
+
 } // namespace app

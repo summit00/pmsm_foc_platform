@@ -2,6 +2,7 @@
 #include "bsp.hpp"
 #include "controlInputsFromUart.hpp"
 #include "current_adc_hal.hpp"
+#include "dwt_cycle_counter.hpp"
 #include "foc.hpp"
 #include "gate_driver_enable.hpp"
 #include "inverter.hpp"
@@ -24,8 +25,9 @@ inline hal::GateDriverEnable
                 {bsp::powerstage_enable_b().port, bsp::powerstage_enable_b().pin},
                 {bsp::powerstage_enable_c().port, bsp::powerstage_enable_c().pin},
                 {bsp::powerstage_enable_general().port, bsp::powerstage_enable_general().pin});
+inline hal::DwtCycleCounter cycle_counter;
 
-inline app::FOC foc{current_sense, telemetry, control_inputs, inverter, gate_enable};
+inline app::FOC foc{current_sense, telemetry, control_inputs, inverter, gate_enable, cycle_counter};
 
 inline void motor_control_isr()
 {

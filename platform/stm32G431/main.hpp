@@ -1,5 +1,6 @@
 #pragma once
 #include "bsp.hpp"
+#include "dwt_cycle_counter.hpp"
 #include "gpio.h"
 #include "gpio_out_hal.hpp"
 #include "heartbeat.hpp"
@@ -87,6 +88,8 @@ struct MainApp
 
         // UART link (commands + telemetry)
         platform::uart_init();
+
+        hal::DwtCycleCounter::enable();
 
         // Initialize heartbeat
         // hb.start(tick);
