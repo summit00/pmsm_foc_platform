@@ -2,10 +2,10 @@
 #include "bsp.hpp"
 #include "dwt_cycle_counter.hpp"
 #include "gpio.h"
-#include "gpio_out_hal.hpp"
+#include "gpio_out.hpp"
 #include "heartbeat.hpp"
 #include "stm32g4xx_hal.h"
-#include "tick_hal.hpp"
+#include "tick.hpp"
 
 // UART commands + telemetry
 #include "uart_link.hpp"

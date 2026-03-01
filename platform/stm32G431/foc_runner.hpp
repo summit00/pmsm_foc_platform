@@ -1,7 +1,7 @@
 #pragma once
 #include "bsp.hpp"
 #include "controlInputsFromUart.hpp"
-#include "current_adc_hal.hpp"
+#include "current_adc.hpp"
 #include "dwt_cycle_counter.hpp"
 #include "foc.hpp"
 #include "gate_driver_enable.hpp"
