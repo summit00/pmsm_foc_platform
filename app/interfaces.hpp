@@ -22,11 +22,19 @@ struct PhaseCurrentsRaw
     uint16_t ib_counts;
 };
 
+struct PhaseCurrents
+{
+    float ia_A;
+    float ib_A;
+};
+
 class ICurrentSense
 {
   public:
     virtual ~ICurrentSense() = default;
     virtual PhaseCurrentsRaw read_raw() const = 0;
+    virtual PhaseCurrents read_amps() const = 0; // <-- new
+    virtual void calibrate_offset() = 0;         // <-- new: call at startup with no current
 };
 
 class ITelemetry

@@ -33,4 +33,10 @@ inline void motor_control_isr()
 {
     foc.run_isr();
 }
+
+inline void calibrate_current_sense()
+{
+    current_sense.calibrate_offset();
+}
+
 } // namespace platform

@@ -44,31 +44,12 @@ extern "C" void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
     if (hadc && hadc->Instance == ADC1)
     {
-        // Handle ADC1 injected conversion complete
-        uint16_t adc1_injected_value = HAL_ADCEx_InjectedGetValue(&hadc1, ADC_INJECTED_RANK_1);
-        uint16_t adc2_injected_value = HAL_ADCEx_InjectedGetValue(&hadc2, ADC_INJECTED_RANK_1);
+        // Read registers directly, bypassing HAL completely
+        uint16_t adc1_value = (uint16_t)(ADC1->JDR1);
+        uint16_t adc2_value = (uint16_t)(ADC2->JDR1);
 
-        platform::current_sense.isr_update_currents(adc1_injected_value, adc2_injected_value);
+        platform::current_sense.isr_update_currents(adc1_value, adc2_value);
         platform::motor_control_isr();
-
-        // if (app::FOC::is_enabled())
-        // {
-
-        //}
-        // else
-        // {
-        //     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_10, GPIO_PIN_RESET);
-        //     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_11, GPIO_PIN_RESET);
-        //     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_RESET);
-        // }
-
-        // static uint16_t irq_counter = 0;
-
-        // if (++irq_counter >= 10000)
-        // {
-        //     irq_counter = 0;
-        //     HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-        // }
     }
 }
 

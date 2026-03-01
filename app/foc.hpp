@@ -26,6 +26,7 @@ class FOC
     void run_isr()
     {
         PhaseCurrentsRaw currents = current_sense.read_raw();
+        PhaseCurrents currents_amps = current_sense.read_amps();
         ControlInputs inputs = control_inputs.read();
 
         bool newEnabled = inputs.enable;
@@ -53,11 +54,11 @@ class FOC
         runtime_measurement.stop();
         runtime2 = runtime_measurement.elapsed_cycles();
 
-        telemetry.publish5_i16(currents.ia_counts,
-                               currents.ib_counts,
-                               isEnabled * 100,
-                               target_speed_rpm,
-                               max_current_mA);
+        telemetry.publish5_i16(static_cast<int16_t>(currents.ia_counts),
+                               static_cast<int16_t>(currents.ib_counts),
+                               static_cast<int16_t>(currents_amps.ia_A * 1000.0f),
+                               static_cast<int16_t>(currents_amps.ib_A * 1000.0f),
+                               isEnabled);
     }
 
     bool is_enabled() const
