@@ -50,7 +50,7 @@ jobs:
           lcov --list coverage.info
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           files: ./build-host/coverage.info
           flags: unittests
@@ -63,7 +63,7 @@ jobs:
           genhtml coverage.info --output-directory coverage_html
 
       - name: Upload coverage HTML
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: build-host/coverage_html
