@@ -1,37 +1,45 @@
 #include <algorithm>
 
-class PIController {
-public:
-    PIController(float kp, float ki) : kp_(kp), ki_(ki) {}
+class PIController
+{
+  public:
+    PIController(float kp, float ki) : mKp(kp), mKi(ki)
+    {
+    }
 
-    float compute(float setpoint, float measured, float min, float max) {
+    float compute(float setpoint, float measured, float min, float max)
+    {
         float error = setpoint - measured;
-        float prop = kp_ * error;
+        float prop = mKp * error;
 
-        float potential_integral = integral_ + (ki_ * error);
-        
-        float total_output = prop + potential_integral;
+        mIntegral = std::clamp(mIntegral + mKi * prop, min, max);
 
-        if (total_output >= min && total_output <= max) {
-            integral_ = potential_integral;
+        return std::clamp(prop + mIntegral, min, max);
+    }
+
+    void setGains(float kp, float ki)
+    {
+        mKp = kp;
+        mKi = ki;
+        if (mKi == 0.0f)
+        {
+            reset();
         }
-
-        return std::clamp(prop + integral_, min, max);
     }
 
-    void setGains(float kp, float ki) {
-        kp_ = kp; ki_ = ki;
+    void getGains(float& kp, float& ki) const
+    {
+        kp = mKp;
+        ki = mKi;
     }
 
-    void getGains(float& kp, float& ki) const {
-        kp = kp_; ki = ki_;
+    void reset()
+    {
+        mIntegral = 0.0f;
     }
 
-    void reset() {
-        integral_ = 0.0f;
-    }
-
-private:
-    float kp_, ki_;
-    float integral_ = 0.0f;
+  private:
+    float mKp;
+    float mKi;
+    float mIntegral = 0.0f;
 };
