@@ -1,0 +1,69 @@
+name: Unit Tests & Coverage
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build lcov
+
+      - name: Create build directory
+        run: mkdir -p build-host
+
+      - name: Configure CMake
+        run: |
+          cd build-host
+          cmake -S .. -B . -G Ninja \
+            -DPLATFORM=host \
+            -DBUILD_TESTS=ON \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS="--coverage -fprofile-arcs -ftest-coverage"
+
+      - name: Build tests
+        run: |
+          cd build-host
+          cmake --build .
+
+      - name: Run tests
+        run: |
+          cd build-host
+          ctest --output-on-failure
+
+      - name: Generate coverage report
+        run: |
+          cd build-host
+          lcov --directory . --capture --output-file coverage.info
+          lcov --remove coverage.info '/usr/*' '*/third_party/*' '*/tests/*' --output-file coverage.info
+          lcov --list coverage.info
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./build-host/coverage.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Generate HTML coverage report
+        run: |
+          cd build-host
+          genhtml coverage.info --output-directory coverage_html
+
+      - name: Upload coverage HTML
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: build-host/coverage_html
