@@ -1,29 +1,46 @@
 #pragma once
+#include "math.hpp"
 #include <cmath>
-#include <array>
+#include <numbers>
+#include <tuple>
 
-class Transforms {
-public:
-    static std::array<float,2> clarke(const std::array<float,3>& abc) {
-        float alpha = abc[0];
-        float beta  = (abc[0] + 2.0f * abc[1]) / 1.7320508f; // sqrt(3)
+class Transforms
+{
+  public:
+    static std::tuple<float, float> clarke(float a, float c)
+    {
+        float alpha = a;
+        // Derived from Ib = -(Ia + Ic):
+        // beta = (Ia + 2*(-Ia - Ic)) / sqrt(3) => (-Ia - 2Ic) / sqrt(3)
+        float beta = (-a - 2.0f * c) * math::INV_SQRT_3;
         return {alpha, beta};
     }
 
-    static std::array<float,3> inverseClarke(const std::array<float,2>& ab) {
-        float a = ab[0];
-        float b = -0.5f * ab[0] + 0.8660254f * ab[1]; // cos/sin 60 deg
-        float c = -0.5f * ab[0] - 0.8660254f * ab[1];
+    static std::tuple<float, float, float> inverseClarke(float alpha, float beta)
+    {
+        constexpr float sqrt3_over_2 = math::SQRT_3 / 2.0f;
+
+        float a = alpha;
+        float b = -0.5f * alpha + sqrt3_over_2 * beta;
+        float c = -0.5f * alpha - sqrt3_over_2 * beta;
         return {a, b, c};
     }
 
-    static std::array<float,2> park(const std::array<float,2>& ab, float theta) {
-        float d = ab[0] * std::cos(theta) + ab[1] * std::sin(theta);
-        float q = -ab[0] * std::sin(theta) + ab[1] * std::cos(theta);
+    static std::tuple<float, float> park(float alpha, float beta, float theta)
+    {
+        float sin_t, cos_t;
+        std::tie(sin_t, cos_t) = math::sin_cos(theta);
+        float d = alpha * cos_t + beta * sin_t;
+        float q = -alpha * sin_t + beta * cos_t;
         return {d, q};
     }
 
-    static std::array<float,2> inversePark(const std::array<float,2>& dq, float theta) {
-        return park({dq[0], dq[1]}, -theta);
+    static std::tuple<float, float> inversePark(float d, float q, float theta)
+    {
+        float sin_t, cos_t;
+        std::tie(sin_t, cos_t) = math::sin_cos(theta);
+        float alpha = d * cos_t - q * sin_t;
+        float beta = d * sin_t + q * cos_t;
+        return {alpha, beta};
     }
 };

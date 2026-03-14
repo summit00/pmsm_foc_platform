@@ -27,9 +27,9 @@ class Inverter : public app::IInverter
 
         const uint32_t arr = htim->Instance->ARR;
 
-        htim->Instance->CCR1 = static_cast<uint32_t>(duty_a * static_cast<float>(arr));
-        htim->Instance->CCR2 = static_cast<uint32_t>(duty_b * static_cast<float>(arr));
-        htim->Instance->CCR3 = static_cast<uint32_t>(duty_c * static_cast<float>(arr));
+        __HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_1, static_cast<uint32_t>(duty_a * arr));
+        __HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_2, static_cast<uint32_t>(duty_b * arr));
+        __HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_3, static_cast<uint32_t>(duty_c * arr));
     }
 
   private:

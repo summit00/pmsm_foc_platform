@@ -48,7 +48,7 @@ extern "C" void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
         uint16_t adc1_value = (uint16_t)(ADC1->JDR1);
         uint16_t adc2_value = (uint16_t)(ADC2->JDR1);
 
-        platform::current_sense.isr_update_currents(adc1_value, adc2_value);
+        platform::current_sense.isr_update_currents(adc2_value, adc1_value);
         platform::motor_control_isr();
     }
 }

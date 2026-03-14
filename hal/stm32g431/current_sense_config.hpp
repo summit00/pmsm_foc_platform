@@ -15,7 +15,8 @@ struct CurrentSenseConfig
     float opamp_gain = 1.53f;
     float adc_vref_V = 3.3f;
     uint16_t adc_counts_fs = 4095u; // 12-bit full scale
-    uint16_t adc_offset = 2048u;    // default mid-rail, refined by calibrate_offset()
+    uint16_t adc_ia_offset = 2048u;
+    uint16_t adc_ic_offset = 2048u;
 
     // Precomputed: counts-to-amps scale factor
     // V_per_count = Vref / counts_fs

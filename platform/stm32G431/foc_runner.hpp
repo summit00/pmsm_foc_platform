@@ -3,6 +3,7 @@
 #include "controlInputsFromUart.hpp"
 #include "current_adc.hpp"
 #include "dwt_cycle_counter.hpp"
+#include "encoder.hpp"
 #include "foc.hpp"
 #include "gate_driver_enable.hpp"
 #include "inverter.hpp"
@@ -20,6 +21,9 @@ inline hal::CurrentSense current_sense;
 inline ControlInputsFromUart control_inputs;
 inline Telemetry telemetry;
 inline hal::Inverter inverter(htim1);
+
+inline hal::EncoderQEI encoder(htim2, 2000, 4);
+
 inline hal::GateDriverEnable
     gate_enable({bsp::powerstage_enable_a().port, bsp::powerstage_enable_a().pin},
                 {bsp::powerstage_enable_b().port, bsp::powerstage_enable_b().pin},
@@ -27,7 +31,8 @@ inline hal::GateDriverEnable
                 {bsp::powerstage_enable_general().port, bsp::powerstage_enable_general().pin});
 inline hal::DwtCycleCounter cycle_counter;
 
-inline app::FOC foc{current_sense, telemetry, control_inputs, inverter, gate_enable, cycle_counter};
+inline app::FOC foc{
+    current_sense, telemetry, control_inputs, inverter, gate_enable, cycle_counter, encoder};
 
 inline void motor_control_isr()
 {
@@ -39,4 +44,9 @@ inline void calibrate_current_sense()
     current_sense.calibrate_offset();
 }
 
-} // namespace platform
+inline void init_encoder()
+{
+    encoder.start();
+}
+
+}

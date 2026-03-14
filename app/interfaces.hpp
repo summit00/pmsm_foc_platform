@@ -19,13 +19,13 @@ struct IDigitalOut
 struct PhaseCurrentsRaw
 {
     uint16_t ia_counts;
-    uint16_t ib_counts;
+    uint16_t ic_counts;
 };
 
 struct PhaseCurrents
 {
     float ia_A;
-    float ib_A;
+    float ic_A;
 };
 
 class ICurrentSense
@@ -86,6 +86,16 @@ class ICycleCounter
     virtual ~ICycleCounter() = default;
     virtual uint32_t now_cycles() const = 0;
     virtual uint32_t cycles_per_second() const = 0;
+};
+
+class IEncoder
+{
+  public:
+    virtual ~IEncoder() = default;
+
+    virtual uint16_t read_raw() const = 0;
+
+    virtual void reset() = 0;
 };
 
 } // namespace app
