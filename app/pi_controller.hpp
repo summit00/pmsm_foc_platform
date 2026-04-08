@@ -1,3 +1,4 @@
+#include "math.hpp"
 #include <algorithm>
 
 class PIController
@@ -36,6 +37,14 @@ class PIController
     void reset()
     {
         mIntegral = 0.0f;
+    }
+
+    std::array<float, 2> calculatePIGains(float R, float L, float Ts)
+    {
+        float Kp = L / (2.0f * Ts);
+        float Ki = L / R;
+
+        return {Kp, Ki};
     }
 
   private:

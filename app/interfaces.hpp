@@ -37,26 +37,12 @@ class ICurrentSense
     virtual void calibrate_offset() = 0;         // <-- new: call at startup with no current
 };
 
-class ITelemetry
-{
-  public:
-    virtual ~ITelemetry() = default;
-    virtual void publish5_i16(int16_t v0, int16_t v1, int16_t v2, int16_t v3, int16_t v4) = 0;
-};
-
 struct ControlInputs
 {
     uint8_t enable = 0;
     int32_t target_speed_rpm = 0;
     int32_t max_current_mA = 0;
     volatile uint32_t seq;
-};
-
-class IControlInputs
-{
-  public:
-    virtual ~IControlInputs() = default;
-    virtual ControlInputs read() const = 0;
 };
 
 struct PhaseVoltages

@@ -1,13 +1,11 @@
 #pragma once
 #include "bsp.hpp"
-#include "controlInputsFromUart.hpp"
 #include "current_adc.hpp"
 #include "dwt_cycle_counter.hpp"
 #include "encoder.hpp"
 #include "foc.hpp"
 #include "gate_driver_enable.hpp"
 #include "inverter.hpp"
-#include "telemetry.hpp"
 
 extern "C"
 {
@@ -18,10 +16,7 @@ namespace platform
 {
 
 inline hal::CurrentSense current_sense;
-inline ControlInputsFromUart control_inputs;
-inline Telemetry telemetry;
 inline hal::Inverter inverter(htim1);
-
 inline hal::EncoderQEI encoder(htim2, 2000, 4);
 
 inline hal::GateDriverEnable
@@ -31,8 +26,7 @@ inline hal::GateDriverEnable
                 {bsp::powerstage_enable_general().port, bsp::powerstage_enable_general().pin});
 inline hal::DwtCycleCounter cycle_counter;
 
-inline app::FOC foc{
-    current_sense, telemetry, control_inputs, inverter, gate_enable, cycle_counter, encoder};
+inline app::FOC foc{current_sense, inverter, gate_enable, cycle_counter, encoder};
 
 inline void motor_control_isr()
 {
@@ -49,4 +43,4 @@ inline void init_encoder()
     encoder.start();
 }
 
-}
+} // namespace platform

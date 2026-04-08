@@ -9,3 +9,11 @@ This Project shows a CMake build system working on a NucleoG431RB.
 
 
 .\.venv\Scripts\Activate.ps1
+
+
+# Encoder
+- Red --> Vcc
+- Black --> GND
+- Green --> A
+- White --> B
+- Orange --> Index

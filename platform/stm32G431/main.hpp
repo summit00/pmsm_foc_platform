@@ -9,25 +9,18 @@
 #include "stm32g4xx_hal.h"
 #include "tick.hpp"
 
-// UART commands + telemetry
-#include "uart_link.hpp"
-
 extern "C"
 {
 #include "adc.h"
-#include "dma.h"
 #include "gpio.h"
 #include "system_stm32g4xx.h"
 #include "tim.h"
-#include "usart.h"
 }
 
 extern "C"
 {
     void SystemClock_Config(void);
     void MX_GPIO_Init(void);
-    void MX_DMA_Init(void);
-    void MX_USART2_UART_Init(void);
     void MX_TIM1_Init(void);
     void MX_TIM2_Init(void);
     void MX_ADC1_Init(void);
@@ -55,9 +48,7 @@ struct MainApp
     {
         HAL_Init();
         SystemClock_Config();
-        MX_DMA_Init();
         MX_GPIO_Init();
-        MX_USART2_UART_Init();
         MX_TIM1_Init();
         MX_TIM2_Init();
         MX_ADC1_Init();
@@ -65,8 +56,6 @@ struct MainApp
 
         // Set IRQ Priorities
         HAL_NVIC_SetPriority(ADC1_2_IRQn, 0, 0);
-        HAL_NVIC_SetPriority(USART2_IRQn, 5, 0);
-        HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 6, 0);
 
         HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
         HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED);
@@ -86,8 +75,6 @@ struct MainApp
 
         platform::calibrate_current_sense();
 
-        platform::uart_init();
-
         hal::DwtCycleCounter::enable();
 
         // Initialize heartbeat
@@ -97,23 +84,6 @@ struct MainApp
     // Run the main loop
     void loop()
     {
-        static uint32_t last_telem_ms = 0;
-        while (true)
-        {
-            platform::check_for_rx_data();
-            platform::process_line();
-
-            // Send telemetry at 500 Hz (every 2ms).
-            uint32_t now = HAL_GetTick();
-            if ((now - last_telem_ms) >= 2)
-            {
-                last_telem_ms = now;
-                platform::telemetry_try_send();
-            }
-
-            // Optional: heartbeat LED in background
-            // hb.update(tick, led);
-        }
     }
 };
 } // namespace app
