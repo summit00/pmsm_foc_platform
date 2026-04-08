@@ -1,4 +1,5 @@
 #pragma once
+#include "motor_params.hpp"
 #include "pi_controller.hpp"
 #include "precontrol.hpp"
 #include <algorithm>
@@ -10,12 +11,8 @@ namespace app
 class CurrentControl
 {
   public:
-    explicit CurrentControl(const float R_ohm,
-                            const float Ld_H,
-                            const float Lq_H,
-                            const float flux_pm_Wb)
-        : mRs(R_ohm), mLd(Ld_H), mLq(Lq_H), mPsi(flux_pm_Wb), pi_d(0.1f, 100.0f),
-          pi_q(0.1f, 100.0f), precontrol(R_ohm, Ld_H, Lq_H, flux_pm_Wb)
+    explicit CurrentControl(const MotorParams& motorParams)
+        : mMotorParams(motorParams), pi_d(0.1f, 100.0f), pi_q(0.1f, 100.0f), precontrol(motorParams)
     {
         set_params();
     }
@@ -48,19 +45,17 @@ class CurrentControl
 
     void set_params()
     {
-        auto [kp, ki] = pi_d.calculatePIGains(mRs, mLd, 1.0f / 20000.0f);
+        auto [kp, ki] =
+            pi_d.calculatePIGains(mMotorParams.Rs_ohm, mMotorParams.Ld_H, 1.0f / 20000.0f);
         pi_d.setGains(kp, ki);
         pi_q.setGains(kp, ki);
     }
 
   private:
-    float mRs{};
-    float mLd{};
-    float mLq{};
-    float mPsi{};
+    const MotorParams& mMotorParams;
     PIController pi_d;
     PIController pi_q;
-    Precontrol precontrol{mRs, mLd, mLq, mPsi};
+    Precontrol precontrol;
 };
 
 } // namespace app

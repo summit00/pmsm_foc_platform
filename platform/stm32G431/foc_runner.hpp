@@ -6,6 +6,7 @@
 #include "foc.hpp"
 #include "gate_driver_enable.hpp"
 #include "inverter.hpp"
+#include "motor_params.hpp"
 
 extern "C"
 {
@@ -14,6 +15,9 @@ extern "C"
 
 namespace platform
 {
+
+inline app::MotorParams motor_params{
+    .Rs_ohm = 0.1f, .Ld_H = 0.00016f, .Lq_H = 0.00016f, .flux_pm_Wb = 0.00408f, .polePairs = 4.0f};
 
 inline hal::CurrentSense current_sense;
 inline hal::Inverter inverter(htim1);
@@ -26,7 +30,7 @@ inline hal::GateDriverEnable
                 {bsp::powerstage_enable_general().port, bsp::powerstage_enable_general().pin});
 inline hal::DwtCycleCounter cycle_counter;
 
-inline app::FOC foc{current_sense, inverter, gate_enable, cycle_counter, encoder};
+inline app::FOC foc{current_sense, inverter, gate_enable, cycle_counter, encoder, motor_params};
 
 inline void motor_control_isr()
 {

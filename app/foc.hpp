@@ -2,6 +2,7 @@
 #include "VfControl.hpp"
 #include "current_control.hpp"
 #include "interfaces.hpp"
+#include "motor_params.hpp"
 #include "runtime_measurement.hpp"
 #include "theta_generator.hpp"
 #include "transform.hpp"
@@ -20,9 +21,11 @@ class FOC
                  IInverter& inverter,
                  IEnableOutput& gate_enable,
                  const ICycleCounter& cycle_counter,
-                 IEncoder& encoder)
+                 IEncoder& encoder,
+                 const MotorParams& params)
         : current_sense(current_sense), inverter(inverter), gate_enable(gate_enable),
-          encoder(encoder), runtime_measurement(cycle_counter)
+          encoder(encoder), runtime_measurement(cycle_counter), mParams(params),
+          current_control(params)
     {
     }
 
@@ -47,7 +50,10 @@ class FOC
         if (isEnabled == 1)
         {
             runtime_measurement.start();
-            theta_generator.update(mech_rpm_to_elec_rad_per_sec(target_speed_rpm, 4));
+
+            float omega_target = mech_rpm_to_elec_rad_per_sec(target_speed_rpm, mParams.polePairs);
+            theta_generator.update(omega_target);
+
             mTheta = theta_generator.get_theta_rad();
             mOmega_rad_Hz = theta_generator.get_omega_rad_Hz();
 
@@ -77,11 +83,10 @@ class FOC
         return isEnabled;
     }
 
-    float mech_rpm_to_elec_rad_per_sec(int16_t rpm, int16_t pole_pairs) const
+    float mech_rpm_to_elec_rad_per_sec(int16_t rpm, float polePairs) const
     {
         constexpr float rpm_to_rad_Hz = std::numbers::pi_v<float> / 30.0f;
-
-        return static_cast<float>(rpm) * static_cast<float>(pole_pairs) * rpm_to_rad_Hz;
+        return static_cast<float>(rpm) * polePairs * rpm_to_rad_Hz;
     }
 
   private:
@@ -103,20 +108,21 @@ class FOC
         mValpha_V = 0.0f;
         mVbeta_V = 0.0f;
     }
+
     static constexpr float vbus_V = 23.0f;
-    static constexpr float dt_s = 1.0f / 20000.0f; // ISR rate
+    static constexpr float dt_s = 1.0f / 20000.0f;
     static constexpr float ramp_rate_rpm_per_s = 500.0f;
 
     ICurrentSense& current_sense;
     IInverter& inverter;
     IEnableOutput& gate_enable;
     IEncoder& encoder;
+    const MotorParams& mParams; // Shared motor data reference
+
     RuntimeMeasurement runtime_measurement;
-    ThetaGenerator theta_generator{dt_s, mech_rpm_to_elec_rad_per_sec(ramp_rate_rpm_per_s, 4)};
-    float motor_V_per_Hz{48.0f / (14000.0f * 4.0f / 60.0f)};
-    VfControl vf_control{motor_V_per_Hz, 0.3f};
+    ThetaGenerator theta_generator{dt_s, mech_rpm_to_elec_rad_per_sec(ramp_rate_rpm_per_s, 4.0f)};
     Transforms transform;
-    CurrentControl current_control{0.1f, 0.00016f, 0.00016f, 0.00408f};
+    CurrentControl current_control;
 
     uint8_t isEnabled = 0;
     uint8_t newEnabled = 0;
