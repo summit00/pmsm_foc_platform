@@ -4,7 +4,8 @@
 
 TEST_CASE("PI controller test")
 {
-    PIController pi(1.0f, 0.5f);
+    PIController pi;
+    pi.setGains(1.0f, 0.5f);
 
     const float min_lim = -10.0f;
     const float max_lim = 10.0f;

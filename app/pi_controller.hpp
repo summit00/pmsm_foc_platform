@@ -1,12 +1,11 @@
 #include "math.hpp"
 #include <algorithm>
+#include <array>
 
 class PIController
 {
   public:
-    PIController(float kp, float ki) : mKp(kp), mKi(ki)
-    {
-    }
+    PIController() = default;
 
     float compute(float setpoint, float measured, float min, float max)
     {

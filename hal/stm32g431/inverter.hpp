@@ -18,12 +18,13 @@ class Inverter : public app::IInverter
     {
     }
 
-    void set_phase_voltages(float va_V, float vb_V, float vc_V, float v_bus_V) override
+    void
+    set_phase_voltages(float va_V, float vb_V, float vc_V, float v_bus_V, bool isEnabled) override
     {
         // For simplicity, let's assume the voltages are normalized to [0.0, 1.0]
-        float duty_a = std::clamp(0.5f + va_V / v_bus_V, minDuty, maxDuty);
-        float duty_b = std::clamp(0.5f + vb_V / v_bus_V, minDuty, maxDuty);
-        float duty_c = std::clamp(0.5f + vc_V / v_bus_V, minDuty, maxDuty);
+        float duty_a = isEnabled ? std::clamp(0.5f + va_V / v_bus_V, minDuty, maxDuty) : 0.0f;
+        float duty_b = isEnabled ? std::clamp(0.5f + vb_V / v_bus_V, minDuty, maxDuty) : 0.0f;
+        float duty_c = isEnabled ? std::clamp(0.5f + vc_V / v_bus_V, minDuty, maxDuty) : 0.0f;
 
         const uint32_t arr = htim->Instance->ARR;
 

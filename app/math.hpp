@@ -7,6 +7,7 @@ namespace math
 {
 
 constexpr float PI = std::numbers::pi_v<float>;
+constexpr float TWO_PI = 2.0f * PI;
 constexpr float INV_PI = 1.0f / PI;
 constexpr float INV_SQRT_3 = std::numbers::inv_sqrt3_v<float>;
 constexpr float SQRT_3 = std::numbers::sqrt3_v<float>;
