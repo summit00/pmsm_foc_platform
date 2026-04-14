@@ -10,10 +10,10 @@ namespace bsp
 // ======================
 
 // Nucleo-style status LED = PA5
-inline constexpr pinning::GpioPin status_led()
-{
-    return pinning::PA5;
-}
+// inline constexpr pinning::GpioPin status_led()
+// {
+//     return pinning::PA5;
+// }
 
 inline constexpr pinning::GpioPin powerstage_enable_a()
 {

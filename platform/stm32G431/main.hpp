@@ -41,10 +41,10 @@ namespace app
 struct MainApp
 {
     hal::TickHal tick;
-    hal::GpioOutHal led;
-    app::Heartbeat hb;
+    // hal::GpioOutHal led;
+    // app::Heartbeat hb;
 
-    MainApp() : led(bsp::status_led().port, bsp::status_led().pin), hb(500)
+    MainApp() // : led(bsp::status_led().port, bsp::status_led().pin), hb(500)
     {
         HAL_Init();
         SystemClock_Config();

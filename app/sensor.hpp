@@ -15,10 +15,18 @@ class Sensor
 
     void runSensors(float maxEncoderTicks, float targetOmega_rad_Hz, bool motor_enabled)
     {
-        // read out encoder position
-        auto pos_counts = encoder.read_raw();
-        rad_from_ticks(static_cast<float>(maxEncoderTicks - pos_counts), maxEncoderTicks);
+        int32_t current_raw = encoder.read_raw();
+
+        int32_t ticks_int = static_cast<int32_t>(maxEncoderTicks);
+        int32_t raw_diff = current_raw - mQEIOffset_ticks;
+
+        int32_t corrected_counts = (raw_diff % ticks_int + ticks_int) % ticks_int;
+
+        float processed_counts = maxEncoderTicks - static_cast<float>(corrected_counts);
+        rad_from_ticks(processed_counts, maxEncoderTicks);
+
         calculateOmegaEncoder_rad_Hz();
+
         if (motor_enabled)
         {
             theta_generator.update(targetOmega_rad_Hz);
@@ -99,7 +107,8 @@ class Sensor
     float mTheta_Encoder_rad_old{0.0f};
     float mTheta_OpenLoop_rad{0.0f};
     float mOmega_Encoder_rad_Hz{0.0f};
-    float mPolePairs{};
-    float mFilterAlpha = 0.2f;
+    float mPolePairs{4.0f};
+    float mFilterAlpha = 0.01f;
+    uint16_t mQEIOffset_ticks{295};
 };
 } // namespace app
