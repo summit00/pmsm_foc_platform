@@ -1,4 +1,7 @@
+// theta_generator.hpp
 #pragma once
+#include "math.hpp"
+#include <algorithm>
 #include <cmath>
 #include <numbers>
 
@@ -8,50 +11,59 @@ namespace app
 class ThetaGenerator
 {
   public:
-    explicit ThetaGenerator(float dt_s, float ramp_rate_rad_Hz2)
-        : dt_s(dt_s), ramp_rate_rad_Hz2(ramp_rate_rad_Hz2)
+    ThetaGenerator(float dt_s, const float& rampRateRef_rad_Hz2)
+        : mDt_s(dt_s), mRampRateRef_rad_Hz2(rampRateRef_rad_Hz2)
     {
     }
 
-    float update(float target_omega_rad_Hz)
+    void update(float targetOmega_rad_Hz)
     {
-        // Ramp omega toward target.
-        if (omega_rad_Hz < target_omega_rad_Hz)
-            omega_rad_Hz = std::min(omega_rad_Hz + ramp_rate_rad_Hz2 * dt_s, target_omega_rad_Hz);
-        else if (omega_rad_Hz > target_omega_rad_Hz)
-            omega_rad_Hz = std::max(omega_rad_Hz - ramp_rate_rad_Hz2 * dt_s, target_omega_rad_Hz);
+        if (mOmega_rad_Hz < targetOmega_rad_Hz)
+        {
+            mOmega_rad_Hz =
+                std::min(mOmega_rad_Hz + mRampRateRef_rad_Hz2 * mDt_s, targetOmega_rad_Hz);
+        }
+        else if (mOmega_rad_Hz > targetOmega_rad_Hz)
+        {
+            mOmega_rad_Hz =
+                std::max(mOmega_rad_Hz - mRampRateRef_rad_Hz2 * mDt_s, targetOmega_rad_Hz);
+        }
 
-        theta_rad += omega_rad_Hz * dt_s;
+        mTheta_rad += mOmega_rad_Hz * mDt_s;
 
-        // Wrap to [0, 2π].
-        if (theta_rad > 2.0f * std::numbers::pi_v<float>)
-            theta_rad -= 2.0f * std::numbers::pi_v<float>;
-        else if (theta_rad < 0.0f)
-            theta_rad += 2.0f * std::numbers::pi_v<float>;
+        mTheta_rad = std::fmod(mTheta_rad, math::TWO_PI);
 
-        return theta_rad;
+        if (mTheta_rad > math::PI)
+        {
+            mTheta_rad -= math::TWO_PI;
+        }
+        else if (mTheta_rad <= -math::PI)
+        {
+            mTheta_rad += math::TWO_PI;
+        }
     }
 
-    float get_theta_rad() const
+    float getTheta_rad() const
     {
-        return theta_rad;
+        return mTheta_rad;
     }
-    float get_omega_rad_Hz() const
+
+    float getOmega_rad_Hz() const
     {
-        return omega_rad_Hz;
+        return mOmega_rad_Hz;
     }
 
     void reset()
     {
-        theta_rad = 0.0f;
-        omega_rad_Hz = 0.0f;
+        mTheta_rad = 0.0f;
+        mOmega_rad_Hz = 0.0f;
     }
 
   private:
-    float dt_s;
-    float ramp_rate_rad_Hz2;
-    float theta_rad = 0.0f;
-    float omega_rad_Hz = 0.0f;
+    float mDt_s;
+    const float& mRampRateRef_rad_Hz2;
+    float mTheta_rad{0.0f};
+    float mOmega_rad_Hz{0.0f};
 };
 
 } // namespace app

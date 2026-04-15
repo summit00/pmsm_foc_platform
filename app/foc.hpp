@@ -48,10 +48,16 @@ class FOC
         return {Ud, Uq};
     }
 
-    std::tuple<float, float>
-    runSpeedControl(float omegaRef_rad_Hz, float omega_rad_Hz, float outMin, float outMax)
+    std::tuple<float, float> runSpeedControl(
+        float omegaRef_rad_Hz, float omega_rad_Hz, float outMin, float outMax, bool motor_enabled)
     {
         auto IqRef_A = PISpeed.compute(omegaRef_rad_Hz, omega_rad_Hz, outMin, outMax);
+
+        if (!motor_enabled)
+        {
+            IqRef_A = 0.0f;
+        }
+
         return {0.0f, IqRef_A};
     }
 
@@ -59,6 +65,7 @@ class FOC
     {
         pi_d.reset();
         pi_q.reset();
+        PISpeed.reset();
     }
 
     void setCurrentControlGains()

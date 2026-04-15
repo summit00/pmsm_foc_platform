@@ -71,4 +71,10 @@ inline std::tuple<float, float> sin_cos(float x)
     return {sin_x, cos_x};
 }
 
+inline float mechRpmToElecRadPerSec(int16_t rpm, float polePairs)
+{
+    constexpr float rpmToRadHz = PI / 30.0f;
+    return static_cast<float>(rpm) * polePairs * rpmToRadHz;
+}
+
 } // namespace math

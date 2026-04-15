@@ -1,14 +1,22 @@
 #pragma once
+
+#include "QEI_sensor.hpp"
+#include "emk_observer.hpp"
 #include "foc.hpp"
 #include "interfaces.hpp"
 #include "motor_params.hpp"
-#include "sensor.hpp"
+#include "open_loop_sensor.hpp"
+#include "sensor_selector.hpp"
 #include "transform.hpp"
 #include "user_interface.hpp"
+
 #include <cstdint>
+#include <numbers>
+#include <tuple>
 
 namespace app
 {
+
 class Control
 {
   public:
@@ -25,8 +33,13 @@ class Control
                      IEncoder& encoder,
                      MotorParams& motor_params,
                      UserInterface& ui)
-        : current_sense(current_sense), inverter(inverter), gate_enable(gate_enable),
-          encoder(encoder), motor_params(motor_params), foc(motor_params), ui(ui)
+        : mCurrentSense(current_sense), mInverter(inverter), mGateEnable(gate_enable),
+          mMotorParams(motor_params), mFoc(motor_params), mUi(ui),
+          mOpenLoopSensor(
+              1.0f / 20000.0f, mAcceleration_rad_Hz2, mOmegaRef_rad_Hz, mMotorEnabled_bool),
+          mEncoderSensor(encoder, 1.0f / 20000.0f, motor_params.polePairs, 2000.0f, 295),
+          mEmkObserver(1.0f / 20000.0f, mUalpha_V, mUbeta_V, mIalpha_A, mIbeta_A),
+          mSensorSelector(mOpenLoopSensor, mEncoderSensor, mEmkObserver)
     {
     }
 
@@ -34,146 +47,157 @@ class Control
     {
         readUserCommands();
 
-        PhaseCurrents currents = current_sense.read_amps();
-        float ia_A = currents.ia_A;
-        float ic_A = currents.ic_A;
+        PhaseCurrents currents = mCurrentSense.read_amps();
 
-        if (cmd_motor_enabled != motor_enabled)
+        if (mCmdMotorEnabled_bool != mMotorEnabled_bool)
         {
-            motor_enabled = cmd_motor_enabled;
-            gate_enable.set_enable(motor_enabled);
+            mMotorEnabled_bool = mCmdMotorEnabled_bool;
+            mGateEnable.set_enable(mMotorEnabled_bool);
 
-            if (!motor_enabled)
+            if (!mMotorEnabled_bool)
             {
-                foc.resetFoc();
+                mFoc.resetFoc();
+                mSensorSelector.updateAllSensors(); // Keep states reset/aligned
                 return;
             }
         }
 
-        sensor.runSensors(2000.0f, mOmegaRef_rad_Hz, motor_enabled);
+        mSensorSelector.updateAllSensors();
 
-        auto [Ialpha_A, IBeta_A] = transforms.clarke(ia_A, ic_A);
+        float activeTheta_rad = mSensorSelector.getActiveTheta_rad();
+        float activeOmega_rad_Hz = mSensorSelector.getActiveOmega_rad_Hz();
+
+        std::tie(mIalpha_A, mIbeta_A) = mTransforms.clarke(currents.ia_A, currents.ic_A);
+        std::tie(mId_A, mIq_A) = mTransforms.park(mIalpha_A, mIbeta_A, activeTheta_rad);
 
         if (mMode == Mode::OPENLOOP)
         {
-            std::tie(mId_A, mIq_A) = transforms.park(Ialpha_A, IBeta_A, sensor.getThetaOpenLoop());
             mIdRef_A = mIsAbs_A;
             mIqRef_A = 0.0f;
-            std::tie(mUd_V, mUq_V) = foc.runCurrentControl(mIdRef_A,
-                                                           mIqRef_A,
-                                                           mId_A,
-                                                           mIq_A,
-                                                           sensor.getOmegaOpenLoop_rad_Hz(),
-                                                           -Udc_V,
-                                                           Udc_V,
-                                                           motor_enabled);
-            std::tie(mUalpha_V, mUbeta_V) =
-                transforms.inversePark(mUd_V, mUq_V, sensor.getThetaOpenLoop());
         }
         else if (mMode == Mode::CLOSEDLOOP)
         {
-            std::tie(mId_A, mIq_A) = transforms.park(Ialpha_A, IBeta_A, sensor.getThetaEncoder());
-
-                        if (speed_loop_counter == 0)
+            if (++mSpeedLoopCounter_count >= mSpeedLoopDivider_count)
             {
-                std::tie(mIdRef_A, mIqRef_A) = foc.runSpeedControl(
-                    mOmegaRef_rad_Hz, sensor.getOmegaEncoder_rad_Hz(), -mIsAbs_A, mIsAbs_A);
+                mSpeedLoopCounter_count = 0;
+                std::tie(mIdRef_A, mIqRef_A) = mFoc.runSpeedControl(
+                    mOmegaRef_rad_Hz, activeOmega_rad_Hz, -mIsAbs_A, mIsAbs_A, mMotorEnabled_bool);
             }
-
-            // Increment and wrap the counter
-            speed_loop_counter++;
-            if (speed_loop_counter >= speed_loop_divider)
-            {
-                speed_loop_counter = 0;
-            }
-
-            std::tie(mUd_V, mUq_V) = foc.runCurrentControl(mIdRef_A,
-                                                           mIqRef_A,
-                                                           mId_A,
-                                                           mIq_A,
-                                                           sensor.getOmegaEncoder_rad_Hz(),
-                                                           -Udc_V,
-                                                           Udc_V,
-                                                           motor_enabled);
-            std::tie(mUalpha_V, mUbeta_V) =
-                transforms.inversePark(mUd_V, mUq_V, sensor.getThetaEncoder());
         }
         else if (mMode == Mode::AUTOSETUP)
         {
-            // to do: implement auto setup routine.
+            // Implementation pending
         }
 
-        auto [Va_V, Vb_V, Vc_V] = transforms.inverseClarke(mUalpha_V, mUbeta_V);
+        std::tie(mUd_V, mUq_V) = mFoc.runCurrentControl(mIdRef_A,
+                                                        mIqRef_A,
+                                                        mId_A,
+                                                        mIq_A,
+                                                        activeOmega_rad_Hz,
+                                                        -mUdc_V,
+                                                        mUdc_V,
+                                                        mMotorEnabled_bool);
 
-        inverter.set_phase_voltages(Va_V, Vb_V, Vc_V, Udc_V, motor_enabled);
+        std::tie(mUalpha_V, mUbeta_V) = mTransforms.inversePark(mUd_V, mUq_V, activeTheta_rad);
+        auto [Va_V, Vb_V, Vc_V] = mTransforms.inverseClarke(mUalpha_V, mUbeta_V);
 
-        if (mTelemetryCounter++ >= 50)
+        mInverter.set_phase_voltages(Va_V, Vb_V, Vc_V, mUdc_V, mMotorEnabled_bool);
+
+        if (++mTelemetryCounter_count >= 50)
         {
-            mTelemetryCounter = 0;
+            mTelemetryCounter_count = 0;
             writeUserTelemetry();
         }
     }
 
+  private:
     void readUserCommands()
     {
-        cmd_motor_enabled = static_cast<bool>(ui.mEnable);
-        mMode = static_cast<Mode>(ui.mMode);
+        mCmdMotorEnabled_bool = static_cast<bool>(mUi.mEnable);
+
+        Mode newMode = static_cast<Mode>(mUi.mMode);
+        if (newMode != mMode)
+        {
+            mMode = newMode;
+            if (mMode == Mode::OPENLOOP)
+            {
+                mSensorSelector.selectSensor(SensorSelector::SensorType::OpenLoop);
+            }
+            else if (mMode == Mode::CLOSEDLOOP)
+            {
+                mSensorSelector.selectSensor(SensorSelector::SensorType::Encoder);
+            }
+        }
+
         mOmegaRef_rad_Hz =
-            sensor.mech_rpm_to_elec_rad_per_sec(ui.targetSpeed_rpm, motor_params.polePairs);
-        mIsAbs_A = ui.mIsAbs_mA / 1000.0f;
+            math::mechRpmToElecRadPerSec(mUi.targetSpeed_rpm, mMotorParams.polePairs);
         mAcceleration_rad_Hz2 =
-            sensor.mech_rpm_to_elec_rad_per_sec(ui.mAcceleration_rpm_s, motor_params.polePairs);
+            math::mechRpmToElecRadPerSec(mUi.mAcceleration_rpm_s, mMotorParams.polePairs);
+        mIsAbs_A = mUi.mIsAbs_mA / 1000.0f;
     }
 
     void writeUserTelemetry()
     {
-        ui.actualSpeed_rpm =
-            sensor.getOmegaOpenLoop_rad_Hz() * 30.0f / (math::PI * motor_params.polePairs);
-        ui.actualSpeedEncoder_rpm =
-            sensor.getOmegaEncoder_rad_Hz() * 30.0f / (math::PI * motor_params.polePairs);
-        ui.ThetaEncoder_deg = sensor.getThetaEncoder() * 180.0f / math::PI;
-        ui.ThetaOpenLoop_deg = sensor.getThetaOpenLoop() * 180.0f / math::PI;
-        ui.busVoltage_V = Udc_V;
-        ui.Id_A = mId_A;
-        ui.Iq_A = mIq_A;
-        ui.IdRef_A = mIdRef_A;
-        ui.IqRef_A = mIqRef_A;
+        constexpr float radHzToRpm = 30.0f / std::numbers::pi_v<float>;
+        constexpr float radToDeg = 180.0f / std::numbers::pi_v<float>;
+
+        mUi.actualSpeed_rpm =
+            (mOpenLoopSensor.getOmega_rad_Hz() * radHzToRpm) / mMotorParams.polePairs;
+        mUi.actualSpeedEncoder_rpm =
+            (mEncoderSensor.getOmega_rad_Hz() * radHzToRpm) / mMotorParams.polePairs;
+
+        mUi.ThetaEncoder_deg = mEncoderSensor.getTheta_rad() * radToDeg;
+        mUi.ThetaOpenLoop_deg = mOpenLoopSensor.getTheta_rad() * radToDeg;
+
+        mUi.busVoltage_V = mUdc_V;
+        mUi.Id_A = mId_A;
+        mUi.Iq_A = mIq_A;
+        mUi.IdRef_A = mIdRef_A;
+        mUi.IqRef_A = mIqRef_A;
     }
 
-  private:
-    ICurrentSense& current_sense;
-    IInverter& inverter;
-    IEnableOutput& gate_enable;
-    IEncoder& encoder;
-    MotorParams& motor_params;
+    // Hardware Interfaces
+    ICurrentSense& mCurrentSense;
+    IInverter& mInverter;
+    IEnableOutput& mGateEnable;
+    MotorParams& mMotorParams;
+    UserInterface& mUi;
 
-    Sensor sensor{encoder, 4.0f};
-    FOC foc;
-    Transforms transforms;
+    // Sensor Architecture
+    OpenLoopSensor mOpenLoopSensor;
+    EncoderSensor mEncoderSensor;
+    EmkObserver mEmkObserver;
+    SensorSelector mSensorSelector;
 
-    UserInterface& ui;
+    // Controllers & Math
+    FOC mFoc;
+    Transforms mTransforms;
 
+    // Control Variables
     float mOmegaRef_rad_Hz{0.0f};
     float mIdRef_A{0.0f};
     float mIqRef_A{0.0f};
     float mId_A{0.0f};
     float mIq_A{0.0f};
+    float mIalpha_A{0.0f};
+    float mIbeta_A{0.0f};
     float mUd_V{0.0f};
     float mUq_V{0.0f};
     float mUalpha_V{0.0f};
     float mUbeta_V{0.0f};
     float mIsAbs_A{0.0f};
-    Mode mMode{0};
-
-    float Udc_V = 24.0f;
-
-    bool motor_enabled = false;
-    bool cmd_motor_enabled = false;
+    float mUdc_V{24.0f};
     float mAcceleration_rad_Hz2{0.0f};
-    uint8_t mTelemetryCounter = 0;
 
-    uint32_t speed_loop_counter = 0;
-    const uint32_t speed_loop_divider = 10;
+    // State Variables
+    Mode mMode{Mode::OPENLOOP};
+    bool mMotorEnabled_bool{false};
+    bool mCmdMotorEnabled_bool{false};
+
+    // Counters
+    uint8_t mTelemetryCounter_count{0};
+    uint32_t mSpeedLoopCounter_count{0};
+    const uint32_t mSpeedLoopDivider_count{10};
 };
 
 } // namespace app
