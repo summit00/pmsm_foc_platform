@@ -3,6 +3,7 @@
 #include "QEI_sensor.hpp"
 #include "dq_limiter.hpp"
 #include "emk_observer.hpp"
+#include "fault_manager.hpp"
 #include "foc.hpp"
 #include "interfaces.hpp"
 #include "motor_params.hpp"
@@ -41,7 +42,7 @@ class Control
               1.0f / 20000.0f, mAcceleration_rad_Hz2, mOmegaRef_rad_Hz, mMotorEnabled_bool),
           mEncoderSensor(encoder, 1.0f / 20000.0f, motor_params.polePairs, 2000.0f, 295),
           mEmkObserver(1.0f / 20000.0f, mUalpha_V, mUbeta_V, mIalpha_A, mIbeta_A),
-          mSensorSelector(mOpenLoopSensor, mEncoderSensor, mEmkObserver)
+          mSensorSelector(mOpenLoopSensor, mEncoderSensor, mEmkObserver), mFaultManager(2.7f)
     {
     }
 
@@ -50,6 +51,14 @@ class Control
         readUserCommands();
 
         PhaseCurrents currents = mCurrentSense.read_amps();
+
+        mFaultManager.checkForFaults(currents.ia_A, currents.ic_A);
+
+        if (mFaultManager.isFaulted())
+        {
+            mCmdMotorEnabled_bool = false;
+            mUi.mEnable = 0;
+        }
 
         if (mCmdMotorEnabled_bool != mMotorEnabled_bool)
         {
@@ -179,6 +188,7 @@ class Control
     // Controllers & Math
     FOC mFoc;
     Transforms mTransforms;
+    FaultManager mFaultManager;
 
     // Control Variables
     float mOmegaRef_rad_Hz{0.0f};
