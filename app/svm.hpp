@@ -2,7 +2,10 @@
 #include <cmath>
 #include <tuple>
 
-std::tuple<float, float, float> spaceVectorModulation(float va, float vb, float vc)
+namespace app
+{
+
+inline std::tuple<float, float, float> spaceVectorModulation(float va, float vb, float vc)
 {
     float minV = std::min({va, vb, vc});
     float maxV = std::max({va, vb, vc});
@@ -16,3 +19,5 @@ std::tuple<float, float, float> spaceVectorModulation(float va, float vb, float 
 
     return {va_out, vb_out, vc_out};
 }
+
+} // namespace app

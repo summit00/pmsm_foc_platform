@@ -1,6 +1,8 @@
 #include <cmath>
 #include <tuple>
 
+namespace app
+{
 class DQLimiter
 {
   public:
@@ -29,3 +31,4 @@ class DQLimiter
         return {d_sat, q_sat};
     }
 };
+} // namespace app

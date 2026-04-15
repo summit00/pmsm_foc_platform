@@ -1,12 +1,14 @@
 #pragma once
 
 #include "QEI_sensor.hpp"
+#include "dq_limiter.hpp"
 #include "emk_observer.hpp"
 #include "foc.hpp"
 #include "interfaces.hpp"
 #include "motor_params.hpp"
 #include "open_loop_sensor.hpp"
 #include "sensor_selector.hpp"
+#include "svm.hpp"
 #include "transform.hpp"
 #include "user_interface.hpp"
 
@@ -98,8 +100,13 @@ class Control
                                                         mUdc_V,
                                                         mMotorEnabled_bool);
 
+        float max_voltage_V = mUdc_V / std::sqrt(3.0f);
+        std::tie(mUd_V, mUq_V) = DQLimiter::applyLimit(mUd_V, mUq_V, max_voltage_V);
+
         std::tie(mUalpha_V, mUbeta_V) = mTransforms.inversePark(mUd_V, mUq_V, activeTheta_rad);
         auto [Va_V, Vb_V, Vc_V] = mTransforms.inverseClarke(mUalpha_V, mUbeta_V);
+
+        std::tie(Va_V, Vb_V, Vc_V) = spaceVectorModulation(Va_V, Vb_V, Vc_V);
 
         mInverter.set_phase_voltages(Va_V, Vb_V, Vc_V, mUdc_V, mMotorEnabled_bool);
 
