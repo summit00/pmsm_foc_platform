@@ -30,29 +30,36 @@ class Control
         AUTOSETUP = 2,
     };
 
-    explicit Control(ICurrentSense& current_sense,
+    explicit Control(IADC& adc_sense,
                      IInverter& inverter,
                      IEnableOutput& gate_enable,
                      IEncoder& encoder,
                      MotorParams& motor_params,
                      UserInterface& ui)
-        : mCurrentSense(current_sense), mInverter(inverter), mGateEnable(gate_enable),
+        : mAdcSense(adc_sense), mInverter(inverter), mGateEnable(gate_enable),
           mMotorParams(motor_params), mFoc(motor_params), mUi(ui),
           mOpenLoopSensor(
               1.0f / 20000.0f, mAcceleration_rad_Hz2, mOmegaRef_rad_Hz, mMotorEnabled_bool),
           mEncoderSensor(encoder, 1.0f / 20000.0f, motor_params.polePairs, 2000.0f, 295),
           mEmkObserver(1.0f / 20000.0f, mUalpha_V, mUbeta_V, mIalpha_A, mIbeta_A),
-          mSensorSelector(mOpenLoopSensor, mEncoderSensor, mEmkObserver), mFaultManager(2.7f)
+          mSensorSelector(mOpenLoopSensor, mEncoderSensor, mEmkObserver), mFaultManager()
     {
+        mUdcBus_V = mAdcSense.read_bus_voltage();
+        mTemp_C = mAdcSense.read_temperature_celsius();
+        mFaultManager.clearFaults();
     }
 
     void run_isr()
     {
         readUserCommands();
 
-        PhaseCurrents currents = mCurrentSense.read_amps();
+        PhaseCurrents currents = mAdcSense.read_amps();
+        mUdcBus_V = mAdcSense.read_bus_voltage();
+        mUsLimit_V = mUdcBus_V * math::INV_SQRT_3;
+        mTemp_C = mAdcSense.read_temperature_celsius();
 
-        mFaultManager.checkForFaults(currents.ia_A, currents.ic_A);
+        mFaultManager.checkForFaults(currents.ia_A, currents.ic_A, mUdcBus_V, mTemp_C);
+        mIsErrorrState = mFaultManager.getFaultType();
 
         if (mFaultManager.isFaulted())
         {
@@ -105,19 +112,18 @@ class Control
                                                         mId_A,
                                                         mIq_A,
                                                         activeOmega_rad_Hz,
-                                                        -mUdc_V,
-                                                        mUdc_V,
+                                                        -mUsLimit_V,
+                                                        mUsLimit_V,
                                                         mMotorEnabled_bool);
 
-        float max_voltage_V = mUdc_V / std::sqrt(3.0f);
-        std::tie(mUd_V, mUq_V) = DQLimiter::applyLimit(mUd_V, mUq_V, max_voltage_V);
+        std::tie(mUd_V, mUq_V) = DQLimiter::applyLimit(mUd_V, mUq_V, mUsLimit_V);
 
         std::tie(mUalpha_V, mUbeta_V) = mTransforms.inversePark(mUd_V, mUq_V, activeTheta_rad);
         auto [Va_V, Vb_V, Vc_V] = mTransforms.inverseClarke(mUalpha_V, mUbeta_V);
 
         std::tie(Va_V, Vb_V, Vc_V) = spaceVectorModulation(Va_V, Vb_V, Vc_V);
 
-        mInverter.set_phase_voltages(Va_V, Vb_V, Vc_V, mUdc_V, mMotorEnabled_bool);
+        mInverter.set_phase_voltages(Va_V, Vb_V, Vc_V, mUdcBus_V, mMotorEnabled_bool);
 
         if (++mTelemetryCounter_count >= 50)
         {
@@ -165,15 +171,14 @@ class Control
         mUi.ThetaEncoder_deg = mEncoderSensor.getTheta_rad() * radToDeg;
         mUi.ThetaOpenLoop_deg = mOpenLoopSensor.getTheta_rad() * radToDeg;
 
-        mUi.busVoltage_V = mUdc_V;
+        mUi.busVoltage_V = mUdcBus_V;
         mUi.Id_A = mId_A;
         mUi.Iq_A = mIq_A;
         mUi.IdRef_A = mIdRef_A;
         mUi.IqRef_A = mIqRef_A;
     }
 
-    // Hardware Interfaces
-    ICurrentSense& mCurrentSense;
+    IADC& mAdcSense;
     IInverter& mInverter;
     IEnableOutput& mGateEnable;
     MotorParams& mMotorParams;
@@ -203,8 +208,11 @@ class Control
     float mUalpha_V{0.0f};
     float mUbeta_V{0.0f};
     float mIsAbs_A{0.0f};
-    float mUdc_V{24.0f};
     float mAcceleration_rad_Hz2{0.0f};
+    float mUdcBus_V{0.0f};
+    float mTemp_C{0.0f};
+    float mUsLimit_V{};
+    uint8_t mIsErrorrState{};
 
     // State Variables
     Mode mMode{Mode::OPENLOOP};

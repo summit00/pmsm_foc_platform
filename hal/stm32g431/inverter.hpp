@@ -36,6 +36,6 @@ class Inverter : public app::IInverter
   private:
     TIM_HandleTypeDef* htim;
     float minDuty = 0.0f;
-    float maxDuty = 0.9f;
+    float maxDuty = 0.95f;
 };
 } // namespace hal

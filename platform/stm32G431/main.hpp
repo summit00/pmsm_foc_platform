@@ -1,6 +1,6 @@
 #pragma once
+#include "adc.hpp"
 #include "bsp.hpp"
-#include "current_adc.hpp"
 #include "dwt_cycle_counter.hpp"
 #include "foc_runner.hpp"
 #include "gpio.h"

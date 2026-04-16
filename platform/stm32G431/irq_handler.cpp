@@ -26,11 +26,15 @@ extern "C" void HAL_ADCEx_InjectedConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
     if (hadc && hadc->Instance == ADC1)
     {
-        // Read registers directly, bypassing HAL completely
-        uint16_t adc1_value = (uint16_t)(ADC1->JDR1);
-        uint16_t adc2_value = (uint16_t)(ADC2->JDR1);
+        // Read Currents.
+        uint16_t ic_raw = (uint16_t)(ADC1->JDR1);
+        uint16_t ia_raw = (uint16_t)(ADC2->JDR1);
 
-        platform::current_sense.isr_update_currents(adc2_value, adc1_value);
+        // Read Vbus and Temp.
+        uint16_t vbus_raw = (uint16_t)(ADC1->JDR2);
+        uint16_t temp_raw = (uint16_t)(ADC2->JDR2);
+
+        platform::adc_sense.isr_update(ia_raw, ic_raw, vbus_raw, temp_raw);
         platform::motor_control_isr();
     }
 }

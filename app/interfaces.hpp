@@ -28,13 +28,15 @@ struct PhaseCurrents
     float ic_A;
 };
 
-class ICurrentSense
+class IADC
 {
   public:
-    virtual ~ICurrentSense() = default;
+    virtual ~IADC() = default;
+    virtual PhaseCurrents read_amps() const = 0;
+    virtual float read_bus_voltage() const = 0;
+    virtual float read_temperature_celsius() const = 0;
     virtual PhaseCurrentsRaw read_raw() const = 0;
-    virtual PhaseCurrents read_amps() const = 0; // <-- new
-    virtual void calibrate_offset() = 0;         // <-- new: call at startup with no current
+    virtual void calibrate_offset() = 0;
 };
 
 struct ControlInputs
