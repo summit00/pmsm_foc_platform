@@ -19,21 +19,14 @@ struct SimMotorParams
 
 namespace motors
 {
-inline constexpr SimMotorParams drone_motor{.Rs_ohm = 0.11f,
-                                            .Ld_H = 0.000016f,
-                                            .Lq_H = 0.000016f,
-                                            .fluxPm_Wb = 0.00408f,
-                                            .polePairs_count = 4.0f,
-                                            .inertia_kgm2 = 0.00001f,
-                                            .viscousFriction_Nms = 0.000001f};
 
-inline constexpr SimMotorParams heavy_servo{.Rs_ohm = 0.1f,
-                                            .Ld_H = 0.00016f,
-                                            .Lq_H = 0.00016f,
-                                            .fluxPm_Wb = 0.00408f,
-                                            .polePairs_count = 4.0f,
-                                            .inertia_kgm2 = 8.8e-6f,
-                                            .viscousFriction_Nms = 0.0001f};
+inline constexpr SimMotorParams motor1{.Rs_ohm = 0.1f,
+                                       .Ld_H = 0.00016f,
+                                       .Lq_H = 0.00016f,
+                                       .fluxPm_Wb = 0.00408f,
+                                       .polePairs_count = 4.0f,
+                                       .inertia_kgm2 = 8.8e-6f,
+                                       .viscousFriction_Nms = 3.6e-6f};
 } // namespace motors
 
 } // namespace sim

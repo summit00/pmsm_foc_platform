@@ -7,19 +7,19 @@
 class Transforms
 {
   public:
+    static std::tuple<float, float> clarke(float a, float b, float c)
+    {
+        // Amplitude Invariant Clarke Transform (matches Simulink default)
+        float alpha = (2.0f / 3.0f) * a - (1.0f / 3.0f) * b - (1.0f / 3.0f) * c;
+        float beta = (1.0f / math::SQRT_3) * (b - c);
+        return {alpha, beta};
+    }
     static std::tuple<float, float> clarke(float a, float c)
     {
         float alpha = a;
         // Derived from Ib = -(Ia + Ic):
         // beta = (Ia + 2*(-Ia - Ic)) / sqrt(3) => (-Ia - 2Ic) / sqrt(3)
         float beta = (-a - 2.0f * c) * math::INV_SQRT_3;
-        return {alpha, beta};
-    }
-
-    static std::tuple<float, float> clarke(float a, float b, [[maybe_unused]] float c)
-    {
-        float alpha = a;
-        float beta = (a + 2.0f * b) * math::INV_SQRT_3;
         return {alpha, beta};
     }
 

@@ -30,7 +30,7 @@ class SimEncoder : public app::IEncoder
 
         float ticks = (normalizedTheta / math::TWO_PI) * mMaxTicks_count;
 
-                return static_cast<uint16_t>(ticks) % mMaxTicks_count;
+        return static_cast<uint16_t>(ticks) % mMaxTicks_count;
     }
 
     void reset() override

@@ -43,7 +43,7 @@ class SimRunner
 
           // Initialize Mock Hardware
           mSimAdc(mMotor), mSimInverter(),
-          mSimEncoder(mMotor, 8000, simParams.polePairs_count), // Assuming 2000 CPR = 8000 ticks
+          mSimEncoder(mMotor, 2000, simParams.polePairs_count), // Assuming 2000 CPR = 8000 ticks
           mSimGateEnable(),
 
           // Initialize the actual Controller!
@@ -60,6 +60,8 @@ class SimRunner
         {
             // 1. Advance Time (for logging)
             mCurrentTime_s += mPhysicsDt_s;
+
+            mSimInverter.update_latched_voltages();
 
             // 2. Step the Physics Engine (using voltages sitting in the mock inverter)
             mMotor.stepSimulation(mPhysicsDt_s,

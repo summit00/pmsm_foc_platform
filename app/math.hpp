@@ -1,6 +1,7 @@
 #pragma once
 #include <cmath>
 #include <numbers>
+#include <stdint.h>
 #include <tuple>
 
 namespace math
@@ -69,6 +70,16 @@ inline std::tuple<float, float> sin_cos(float x)
     float sin_x = x + x * x2 * sin_poly(x2);
     float cos_x = 1.0f + x2 * cos_poly(x2);
     return {sin_x, cos_x};
+}
+
+inline float rpmToRadPerSec(float rpm)
+{
+    return rpm * (PI / 30.0f);
+}
+
+inline float radPerSecToRpm(float omega_rad_s)
+{
+    return omega_rad_s * (30.0f / PI);
 }
 
 inline float mechRpmToElecRadPerSec(int16_t rpm, float polePairs)

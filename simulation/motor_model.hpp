@@ -24,26 +24,24 @@ class MotorModel
 
     void stepSimulation(float dt_s, float vu_V, float vv_V, float vw_V, float loadTorque_Nm)
     {
-        float thetaElec = mState.mThetaMech_rad * mParams.polePairs_count;
-
         auto [alphaV, betaV] = Transforms::clarke(vu_V, vv_V, vw_V);
-        auto [vd_V, vq_V] = Transforms::park(alphaV, betaV, thetaElec);
-
-        mLastInputs = {vd_V, vq_V, loadTorque_Nm};
 
         mState = mSolver.calculateNextState(
             mState,
             dt_s,
-            [this](const MotorState& state)
+            [&](const MotorState& state)
             {
+                // Calculate the DQ voltages for THIS specific sub-probe angle
+                float subThetaElec = state.mThetaMech_rad * mParams.polePairs_count;
+                auto [vd, vq] = Transforms::park(alphaV, betaV, subThetaElec);
+
                 MotorState rates;
                 float omegaElec = state.mOmegaMech_rad_s * mParams.polePairs_count;
 
-                rates.mId_A = (mLastInputs.mVd_V - mParams.Rs_ohm * state.mId_A +
-                               omegaElec * mParams.Lq_H * state.mIq_A) /
-                              mParams.Ld_H;
-
-                rates.mIq_A = (mLastInputs.mVq_V - mParams.Rs_ohm * state.mIq_A -
+                rates.mId_A =
+                    (vd - mParams.Rs_ohm * state.mId_A + omegaElec * mParams.Lq_H * state.mIq_A) /
+                    mParams.Ld_H;
+                rates.mIq_A = (vq - mParams.Rs_ohm * state.mIq_A -
                                omegaElec * (mParams.Ld_H * state.mId_A + mParams.fluxPm_Wb)) /
                               mParams.Lq_H;
 
