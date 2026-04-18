@@ -112,6 +112,22 @@
       "group": "test",
       "dependsOn": ["Build: SIL Simulation"],
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "DEBUG: Build and Run Marked Test",
+      "type": "shell",
+      "command": "./build-host/tests/sim/system_test.exe [debug] -s",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "dependsOn": ["Build: SIL Simulation"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
     }
   ]
 }
