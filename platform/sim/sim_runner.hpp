@@ -25,10 +25,11 @@ class SimRunner
   public:
     // Setup the simulation environment (e.g., 20kHz control, 10x physics oversampling)
     SimRunner(const SimMotorParams& simParams,
-              float ctrlFreq_Hz = 20000.0f,
+              const ILoadModel& externalLoad,
+              const std::string& logFilename = "sim_output.csv",
               uint32_t physicsOversample_count = 10,
-              const std::string& logFilename = "sim_output.csv")
-        : mCtrlFreq_Hz(ctrlFreq_Hz), mPhysicsDt_s(1.0f / (ctrlFreq_Hz * physicsOversample_count)),
+              float ctrlFreq_Hz = 20000.0f)
+        : mCtrlFreq_Hz(20000.0f), mPhysicsDt_s(1.0f / (ctrlFreq_Hz * physicsOversample_count)),
           mStepsPerIsr_count(physicsOversample_count),
 
           // Initialize App Parameters from Sim Parameters
@@ -39,7 +40,7 @@ class SimRunner
                           simParams.polePairs_count},
 
           // Initialize Physics
-          mMotor(simParams, mSolver), mLogger(logFilename),
+          mMotor(simParams, mSolver, externalLoad), mLogger(logFilename),
 
           // Initialize Mock Hardware
           mSimAdc(mMotor), mSimInverter(),
@@ -64,11 +65,8 @@ class SimRunner
             mSimInverter.update_latched_voltages();
 
             // 2. Step the Physics Engine (using voltages sitting in the mock inverter)
-            mMotor.stepSimulation(mPhysicsDt_s,
-                                  mSimInverter.getVu(),
-                                  mSimInverter.getVv(),
-                                  mSimInverter.getVw(),
-                                  loadTorque_Nm);
+            mMotor.stepSimulation(
+                mPhysicsDt_s, mSimInverter.getVu(), mSimInverter.getVv(), mSimInverter.getVw());
 
             // 3. Run the Controller ISR (only on specific physics ticks)
             if (step % mStepsPerIsr_count == 0)

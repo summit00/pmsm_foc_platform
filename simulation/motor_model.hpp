@@ -1,4 +1,5 @@
 #pragma once
+#include "load.hpp"
 #include "math.hpp"
 #include "motor_parameter_sets.hpp"
 #include "solver.hpp"
@@ -17,12 +18,12 @@ struct PhaseCurrents
 class MotorModel
 {
   public:
-    explicit MotorModel(const SimMotorParams& params, ISolver& solver)
-        : mParams(params), mSolver(solver)
+    explicit MotorModel(const SimMotorParams& params, ISolver& solver, const ILoadModel& load)
+        : mParams(params), mSolver(solver), mLoad(load)
     {
     }
 
-    void stepSimulation(float dt_s, float vu_V, float vv_V, float vw_V, float loadTorque_Nm)
+    void stepSimulation(float dt_s, float vu_V, float vv_V, float vw_V)
     {
         auto [alphaV, betaV] = Transforms::clarke(vu_V, vv_V, vw_V);
 
@@ -31,13 +32,13 @@ class MotorModel
             dt_s,
             [&](const MotorState& state)
             {
-                // Calculate the DQ voltages for THIS specific sub-probe angle
                 float subThetaElec = state.mThetaMech_rad * mParams.polePairs_count;
                 auto [vd, vq] = Transforms::park(alphaV, betaV, subThetaElec);
 
                 MotorState rates;
                 float omegaElec = state.mOmegaMech_rad_s * mParams.polePairs_count;
 
+                // Physics...
                 rates.mId_A =
                     (vd - mParams.Rs_ohm * state.mId_A + omegaElec * mParams.Lq_H * state.mIq_A) /
                     mParams.Ld_H;
@@ -45,9 +46,12 @@ class MotorModel
                                omegaElec * (mParams.Ld_H * state.mId_A + mParams.fluxPm_Wb)) /
                               mParams.Lq_H;
 
-                float torque = 1.5f * mParams.polePairs_count * mParams.fluxPm_Wb * state.mIq_A;
-                rates.mOmegaMech_rad_s =
-                    (torque - mLastInputs.mLoadTorque_Nm) / mParams.inertia_kgm2;
+                float torqueGen = 1.5f * mParams.polePairs_count * mParams.fluxPm_Wb * state.mIq_A;
+
+                // PULL FROM CONNECTED LOAD OBJECT
+                float currentLoad = mLoad.getTorque_Nm(state.mOmegaMech_rad_s);
+
+                rates.mOmegaMech_rad_s = (torqueGen - currentLoad) / mParams.inertia_kgm2;
                 rates.mThetaMech_rad = state.mOmegaMech_rad_s;
 
                 return rates;
@@ -105,6 +109,7 @@ class MotorModel
     ISolver& mSolver;
     MotorState mState;
     MotorInputs mLastInputs;
+    const ILoadModel& mLoad;
 };
 
 } // namespace sim

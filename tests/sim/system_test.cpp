@@ -6,7 +6,8 @@
 
 TEST_CASE("Id step response")
 {
-    sim::SimRunner runner(sim::motors::motor1, 20000.0f, 10, "IdStepResponse_test.csv");
+    sim::SimpleLoad load;
+    sim::SimRunner runner(sim::motors::motor1, load, "IdStepResponse_test.csv");
 
     auto& ui = runner.getUi();
     ui.mMode = static_cast<uint8_t>(app::Control::Mode::OPENLOOP);
@@ -25,7 +26,8 @@ TEST_CASE("Id step response")
 
 TEST_CASE("OpenLoop ramp", "[sil][foc]")
 {
-    sim::SimRunner runner(sim::motors::motor1, 20000.0f, 10, "openLoopRamp_test.csv");
+    sim::SimpleLoad load;
+    sim::SimRunner runner(sim::motors::motor1, load, "openLoopRamp_test.csv");
 
     auto& ui = runner.getUi();
     ui.mMode = static_cast<uint8_t>(app::Control::Mode::OPENLOOP);
@@ -42,4 +44,24 @@ TEST_CASE("OpenLoop ramp", "[sil][foc]")
     CHECK(finalState.mIq_A == Catch::Approx(0.0f).margin(0.1f));
     CHECK(finalState.mOmegaMech_rad_s ==
           Catch::Approx(math::rpmToRadPerSec(ui.targetSpeed_rpm)).margin(10.0f));
+}
+
+TEST_CASE("External Load Response", "[debug]")
+{
+    sim::SimpleLoad load;
+    load.setBrakingTorque(0.001f);
+
+    sim::SimRunner runner(sim::motors::motor1, load, "LoadTest.csv");
+
+    auto& ui = runner.getUi();
+    ui.mMode = static_cast<uint8_t>(app::Control::Mode::CLOSEDLOOP);
+    ui.mEnable = 1;
+    ui.targetSpeed_rpm = 500.0f;
+    ui.mAcceleration_rpm_s = 500.0f;
+    ui.mIsAbs_mA = 3000;
+
+    runner.run(1.0f);
+
+    load.setBrakingTorque(0.01f);
+    runner.run(1.0f);
 }
