@@ -4,12 +4,29 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
-TEST_CASE("Id step response", "[sil][foc]")
+TEST_CASE("Id step response")
 {
-    // 1. Setup simulation for a heavy servo motor
-    sim::SimRunner runner(sim::motors::heavy_servo, 20000.0f, 10, "spinup_test.csv");
+    sim::SimRunner runner(sim::motors::motor1, 20000.0f, 10, "IdStepResponse_test.csv");
 
-    // 2. Configure the controller via the User Interface
+    auto& ui = runner.getUi();
+    ui.mMode = static_cast<uint8_t>(app::Control::Mode::OPENLOOP);
+    ui.mEnable = 1;
+    ui.targetSpeed_rpm = 0.0f;
+    ui.mAcceleration_rpm_s = 0.0f;
+    ui.mIsAbs_mA = 1500;
+
+    runner.run(0.5f, 0.0f);
+
+    sim::MotorState finalState = runner.getFinalState();
+
+    CHECK(finalState.mId_A == Catch::Approx(ui.mIsAbs_mA / 1000.0f).margin(0.05f));
+    CHECK(finalState.mIq_A == Catch::Approx(0.0f).margin(0.1f));
+}
+
+TEST_CASE("OpenLoop ramp", "[sil][foc]")
+{
+    sim::SimRunner runner(sim::motors::motor1, 20000.0f, 10, "openLoopRamp_test.csv");
+
     auto& ui = runner.getUi();
     ui.mMode = static_cast<uint8_t>(app::Control::Mode::OPENLOOP);
     ui.mEnable = 1;
@@ -17,13 +34,12 @@ TEST_CASE("Id step response", "[sil][foc]")
     ui.mAcceleration_rpm_s = 500.0f;
     ui.mIsAbs_mA = 1500;
 
-    // 3. Run the simulation for 0.5 seconds of simulated time
-    //    (This applies a 0.1 Nm load torque to the shaft)
     runner.run(1.5f, 0.0f);
 
-    // 4. Verify the results!
     sim::MotorState finalState = runner.getFinalState();
 
-    // Assert that we reached the target speed within a 2.0 rad/s margin
     CHECK(finalState.mId_A == Catch::Approx(ui.mIsAbs_mA / 1000.0f).margin(0.1f));
+    CHECK(finalState.mIq_A == Catch::Approx(0.0f).margin(0.1f));
+    CHECK(finalState.mOmegaMech_rad_s ==
+          Catch::Approx(math::rpmToRadPerSec(ui.targetSpeed_rpm)).margin(10.0f));
 }

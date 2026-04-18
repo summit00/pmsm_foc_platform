@@ -1,42 +1,43 @@
-name: Unit Tests
+name: Continuous Integration
 
 on:
   push:
     branches: [ main, develop ]
   pull_request:
-    branches: [ main, develop ]
 
 jobs:
-  test:
+  logic-unit-tests:
     runs-on: ubuntu-latest
-    
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-
       - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build
+      - name: Configure and Build
         run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build
+          cmake -S . -B build-host -G Ninja -DPLATFORM=host -DBUILD_TESTS=ON
+          cmake --build build-host --target unit_tests
+      - name: Run Unit Tests
+        run: ./build-host/tests/unit_tests/unit_tests
 
-      - name: Create build directory
-        run: mkdir -p build-host
-
-      - name: Configure CMake
+  sil-simulation-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build
+      - name: Configure and Build
         run: |
-          cd build-host
-          cmake -S .. -B . -G Ninja \
-            -DPLATFORM=host \
-            -DBUILD_TESTS=ON \
-            -DCMAKE_BUILD_TYPE=Debug
-
-      - name: Build tests
-        run: |
-          cd build-host
-          cmake --build .
-
-      - name: Run tests
-        run: |
-          cd build-host
-          ctest --output-on-failure
+          cmake -S . -B build-host -G Ninja -DPLATFORM=host -DBUILD_TESTS=ON
+          cmake --build build-host --target system_test
+      - name: Run SIL Simulation
+        run: ./build-host/tests/sim/system_test
+      - name: Archive Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-results
+          path: ./*.csv
