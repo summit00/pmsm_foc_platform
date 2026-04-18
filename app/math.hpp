@@ -77,4 +77,10 @@ inline float mechRpmToElecRadPerSec(int16_t rpm, float polePairs)
     return static_cast<float>(rpm) * polePairs * rpmToRadHz;
 }
 
+inline float elecRadPerSecToMechRpm(float omegaElec_rad_s, float polePairs)
+{
+    constexpr float radHzToRpm = 30.0f / PI;
+    return (omegaElec_rad_s / polePairs) * radHzToRpm;
+}
+
 } // namespace math

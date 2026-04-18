@@ -40,13 +40,87 @@ class Control
           mMotorParams(motor_params), mFoc(motor_params), mUi(ui),
           mOpenLoopSensor(
               1.0f / 20000.0f, mAcceleration_rad_Hz2, mOmegaRef_rad_Hz, mMotorEnabled_bool),
-          mEncoderSensor(encoder, 1.0f / 20000.0f, motor_params.polePairs, 2000.0f, 295),
+          mEncoderSensor(encoder,
+                         1.0f / 20000.0f,
+                         motor_params.polePairs,
+                         2000.0f,
+                         motor_params.encoderOffset_ticks),
           mEmkObserver(1.0f / 20000.0f, mUalpha_V, mUbeta_V, mIalpha_A, mIbeta_A),
           mSensorSelector(mOpenLoopSensor, mEncoderSensor, mEmkObserver), mFaultManager()
     {
         mUdcBus_V = mAdcSense.read_bus_voltage();
         mTemp_C = mAdcSense.read_temperature_celsius();
         mFaultManager.clearFaults();
+    }
+
+    float getIdRef() const
+    {
+        return mIdRef_A;
+    }
+
+    float getIqRef() const
+    {
+        return mIqRef_A;
+    }
+
+    float getOmegaRef_rpm() const
+    {
+        return mOmegaRef_rad_Hz * (30.0f / std::numbers::pi_v<float>) / mMotorParams.polePairs;
+    }
+
+    uint8_t getMode() const
+    {
+        return static_cast<uint8_t>(mMode);
+    }
+
+    uint8_t getIsEnabled() const
+    {
+        return static_cast<uint8_t>(mMotorEnabled_bool);
+    }
+
+    uint8_t getFaultStatus() const
+    {
+        return mIsErrorrState;
+    }
+
+    const PIController& getIdController() const
+    {
+        return mFoc.getIdController();
+    }
+
+    const PIController& getIqController() const
+    {
+        return mFoc.getIqController();
+    }
+
+    float getId_A() const
+    {
+        return mId_A;
+    }
+
+    float getIq_A() const
+    {
+        return mIq_A;
+    }
+
+    float getUd_V() const
+    {
+        return mUd_V;
+    }
+
+    float getUq_V() const
+    {
+        return mUq_V;
+    }
+
+    float getOpenLoopTheta_rad() const
+    {
+        return mOpenLoopSensor.getTheta_rad();
+    }
+
+    float getEncoderTheta_rad() const
+    {
+        return mEncoderSensor.getTheta_rad();
     }
 
     void run_isr()

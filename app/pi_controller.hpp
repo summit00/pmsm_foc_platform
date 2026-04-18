@@ -33,6 +33,16 @@ class PIController
         ki = mKi;
     }
 
+    float getKp() const
+    {
+        return mKp;
+    }
+
+    float getKi() const
+    {
+        return mKi;
+    }
+
     void reset()
     {
         mIntegral = 0.0f;

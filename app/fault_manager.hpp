@@ -55,7 +55,7 @@ class FaultManager
     }
 
   private:
-    float mOverCurrentThreshold_A{2.7f};
+    float mOverCurrentThreshold_A{20.7f};
     FaultType mCurrentFault{FaultType::NONE};
 };
 

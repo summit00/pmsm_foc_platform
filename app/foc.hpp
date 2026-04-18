@@ -48,6 +48,16 @@ class FOC
         return {Ud, Uq};
     }
 
+    const PIController& getIdController() const
+    {
+        return pi_d;
+    }
+
+    const PIController& getIqController() const
+    {
+        return pi_q;
+    }
+
     std::tuple<float, float> runSpeedControl(
         float omegaRef_rad_Hz, float omega_rad_Hz, float outMin, float outMax, bool motor_enabled)
     {

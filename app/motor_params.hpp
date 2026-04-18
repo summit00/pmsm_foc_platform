@@ -10,6 +10,7 @@ struct MotorParams
     float Lq_H = 0.0f;
     float flux_pm_Wb = 0.0f;
     float polePairs = 0.0f;
+    uint16_t encoderOffset_ticks = 0;
 };
 
 } // namespace app

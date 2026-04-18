@@ -16,6 +16,13 @@ class Transforms
         return {alpha, beta};
     }
 
+    static std::tuple<float, float> clarke(float a, float b, [[maybe_unused]] float c)
+    {
+        float alpha = a;
+        float beta = (a + 2.0f * b) * math::INV_SQRT_3;
+        return {alpha, beta};
+    }
+
     static std::tuple<float, float, float> inverseClarke(float alpha, float beta)
     {
         constexpr float sqrt3_over_2 = math::SQRT_3 / 2.0f;

@@ -96,6 +96,61 @@
         "tests: build (host)"
       ],
       "problemMatcher": []
-    }
+    },
+    {
+            "label": "CMake: Configure (Host)",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "-S", "${workspaceFolder}",
+                "-B", "${workspaceFolder}/build-host",
+                "-DPLATFORM=host"
+            ],
+            "problemMatcher": [],
+            "group": "build",
+            "detail": "Generates the host build files for simulation and unit tests."
+        },
+        {
+            "label": "CMake: Build Simulation Test",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build", "${workspaceFolder}/build-host",
+                "--target", "system_test",
+                "--parallel"
+            ],
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Builds just the system_test executable."
+        },
+        {
+            "label": "Run Simulation Test",
+            "type": "process",
+            // Note: Depending on your CMake output settings, this might just be "${workspaceFolder}/build-host/system_test"
+            "command": "${workspaceFolder}/build-host/tests/sim/system_test.exe",
+            "args": [
+                // Catch2 arg: show successful tests too (optional, good for debugging)
+                "-s" 
+            ],
+            "dependsOn": "CMake: Build Simulation Test",
+            "problemMatcher": [],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "clear": true
+            },
+            "detail": "Builds and then executes the Catch2 simulation test."
+        }
   ]
 }
