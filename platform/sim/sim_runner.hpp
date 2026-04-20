@@ -43,8 +43,7 @@ class SimRunner
           mMotor(simParams, mSolver, externalLoad), mLogger(logFilename),
 
           // Initialize Mock Hardware
-          mSimAdc(mMotor), mSimInverter(),
-          mSimEncoder(mMotor, 2000, simParams.polePairs_count), // Assuming 2000 CPR = 8000 ticks
+          mSimAdc(mMotor), mSimInverter(), mSimEncoder(mMotor, 2000, simParams.polePairs_count),
           mSimGateEnable(),
 
           // Initialize the actual Controller!

@@ -62,11 +62,17 @@ class CsvLogger
         record("foc.Uq_V", control.getUq_V());
         record("foc.OpenLoopTheta_rad", control.getOpenLoopTheta_rad());
         record("foc.EncoderTheta_rad", control.getEncoderTheta_rad());
+        record("foc.EmkObserverTheta_rad", control.getEmkObserverTheta_rad());
+        record("foc.ObserverError_deg",
+               math::compute_angle_error(control.getEmkObserverTheta_rad(),
+                                         control.getEncoderTheta_rad()) *
+                   (180.0f / std::numbers::pi_v<float>));
 
         // Simulation Physics (The Ground Truth)
         record("sim.Id_A", simState.mId_A);
         record("sim.Iq_A", simState.mIq_A);
         record("sim.ThetaMech_rad", simState.mThetaMech_rad);
+        record("sim.ThetaElec_rad", motor.getThetaElec_rad());
         record("sim.OmegaMech_rad_s", simState.mOmegaMech_rad_s);
         record("sim.Speed_rpm", simSpeed_rpm);
 

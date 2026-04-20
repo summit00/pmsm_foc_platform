@@ -73,6 +73,22 @@ class MotorModel
         return {u, v, w};
     }
 
+    float getThetaElec_rad() const
+    {
+        float thetaElec = mState.mThetaMech_rad * mParams.polePairs_count;
+        thetaElec = std::fmod(thetaElec, math::TWO_PI);
+
+        if (thetaElec > math::PI)
+        {
+            thetaElec -= math::TWO_PI;
+        }
+        else if (thetaElec <= -math::PI)
+        {
+            thetaElec += math::TWO_PI;
+        }
+        return thetaElec;
+    }
+
     MotorState getState() const
     {
         return mState;

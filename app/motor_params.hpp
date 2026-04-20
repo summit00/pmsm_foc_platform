@@ -11,6 +11,10 @@ struct MotorParams
     float flux_pm_Wb = 0.0f;
     float polePairs = 0.0f;
     uint16_t encoderOffset_ticks = 0;
+    float Ualpha_V = 0.0f;
+    float Ubeta_V = 0.0f;
+    float Ialpha_A = 0.0f;
+    float Ibeta_A = 0.0f;
 };
 
 } // namespace app

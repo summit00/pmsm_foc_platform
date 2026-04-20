@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 #include <cmath>
 #include <numbers>
 #include <stdint.h>
@@ -92,6 +93,22 @@ inline float elecRadPerSecToMechRpm(float omegaElec_rad_s, float polePairs)
 {
     constexpr float radHzToRpm = 30.0f / PI;
     return (omegaElec_rad_s / polePairs) * radHzToRpm;
+}
+
+inline float sign(float val)
+{
+    return (val > 0.0f) ? 1.0f : ((val < 0.0f) ? -1.0f : 0.0f);
+}
+
+inline float soft_sign(float err, float limit)
+{
+    return std::clamp(err / limit, -1.0f, 1.0f);
+}
+
+float compute_angle_error(float target, float actual)
+{
+    float error = std::atan2(sin(target - actual), cos(target - actual));
+    return error;
 }
 
 } // namespace math

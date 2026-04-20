@@ -45,7 +45,7 @@ class Control
                          motor_params.polePairs,
                          2000.0f,
                          motor_params.encoderOffset_ticks),
-          mEmkObserver(1.0f / 20000.0f, mUalpha_V, mUbeta_V, mIalpha_A, mIbeta_A),
+          mEmkObserver(1.0f / 20000.0f, motor_params),
           mSensorSelector(mOpenLoopSensor, mEncoderSensor, mEmkObserver), mFaultManager()
     {
         mUdcBus_V = mAdcSense.read_bus_voltage();
@@ -123,6 +123,11 @@ class Control
         return mEncoderSensor.getTheta_rad();
     }
 
+    float getEmkObserverTheta_rad() const
+    {
+        return mEmkObserver.getTheta_rad();
+    }
+
     void run_isr()
     {
         readUserCommands();
@@ -154,12 +159,17 @@ class Control
             }
         }
 
+        std::tie(mIalpha_A, mIbeta_A) = mTransforms.clarke(currents.ia_A, currents.ic_A);
+        mMotorParams.Ialpha_A = mIalpha_A;
+        mMotorParams.Ibeta_A = mIbeta_A;
+        mMotorParams.Ualpha_V = mUalpha_V;
+        mMotorParams.Ubeta_V = mUbeta_V;
+
         mSensorSelector.updateAllSensors();
 
         float activeTheta_rad = mSensorSelector.getActiveTheta_rad();
         float activeOmega_rad_Hz = mSensorSelector.getActiveOmega_rad_Hz();
 
-        std::tie(mIalpha_A, mIbeta_A) = mTransforms.clarke(currents.ia_A, currents.ic_A);
         std::tie(mId_A, mIq_A) = mTransforms.park(mIalpha_A, mIbeta_A, activeTheta_rad);
 
         if (mMode == Mode::OPENLOOP)
