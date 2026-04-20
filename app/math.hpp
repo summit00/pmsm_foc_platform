@@ -105,7 +105,7 @@ inline float soft_sign(float err, float limit)
     return std::clamp(err / limit, -1.0f, 1.0f);
 }
 
-float compute_angle_error(float target, float actual)
+inline float compute_angle_error(float target, float actual)
 {
     float error = std::atan2(sin(target - actual), cos(target - actual));
     return error;
