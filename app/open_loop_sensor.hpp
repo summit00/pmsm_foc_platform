@@ -1,7 +1,8 @@
 // open_loop_sensor.hpp
 #pragma once
+#include "math.hpp"
 #include "sensor.hpp"
-#include "theta_generator.hpp"
+#include <cmath>
 
 namespace app
 {
@@ -10,10 +11,9 @@ class OpenLoopSensor : public ISensor
 {
   public:
     OpenLoopSensor(float dt_s,
-                   const float& rampRateRef_rad_Hz2,
-                   const float& targetOmegaRef_rad_Hz,
+                   const float& currentOmegaRef_rad_Hz,
                    const bool& motorEnabledRef_bool)
-        : mThetaGenerator(dt_s, rampRateRef_rad_Hz2), mTargetOmegaRef_rad_Hz(targetOmegaRef_rad_Hz),
+        : mDt_s(dt_s), mOmegaRef(currentOmegaRef_rad_Hz),
           mMotorEnabledRef_bool(motorEnabledRef_bool)
     {
     }
@@ -22,33 +22,41 @@ class OpenLoopSensor : public ISensor
     {
         if (mMotorEnabledRef_bool)
         {
-            mThetaGenerator.update(mTargetOmegaRef_rad_Hz);
+            // Directly integrate the reference omega to find theta
+            mTheta_rad += mOmegaRef * mDt_s;
+
+            // Wrap angle between -PI and PI
+            if (mTheta_rad > math::PI)
+                mTheta_rad -= math::TWO_PI;
+            if (mTheta_rad <= -math::PI)
+                mTheta_rad += math::TWO_PI;
         }
         else
         {
-            mThetaGenerator.reset();
+            mTheta_rad = 0.0f;
         }
     }
 
     float getTheta_rad() const override
     {
-        return mThetaGenerator.getTheta_rad();
+        return mTheta_rad;
     }
 
     float getOmega_rad_Hz() const override
     {
-        return mThetaGenerator.getOmega_rad_Hz();
+        return mOmegaRef;
     }
 
     void reset() override
     {
-        mThetaGenerator.reset();
+        mTheta_rad = 0.0f;
     }
 
   private:
-    ThetaGenerator mThetaGenerator;
-    const float& mTargetOmegaRef_rad_Hz;
+    float mDt_s;
+    const float& mOmegaRef;
     const bool& mMotorEnabledRef_bool;
+    float mTheta_rad{0.0f};
 };
 
 } // namespace app

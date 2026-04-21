@@ -24,7 +24,7 @@ TEST_CASE("Id step response")
     CHECK(finalState.mIq_A == Catch::Approx(0.0f).margin(0.1f));
 }
 
-TEST_CASE("OpenLoop ramp", "[sil][foc]")
+TEST_CASE("OpenLoop ramp")
 {
     sim::SimpleLoad load;
     sim::SimRunner runner(sim::motors::motor1, load, "openLoopRamp_test.csv");
@@ -33,7 +33,7 @@ TEST_CASE("OpenLoop ramp", "[sil][foc]")
     ui.mMode = static_cast<uint8_t>(app::Control::Mode::OPENLOOP);
     ui.mEnable = 1;
     ui.targetSpeed_rpm = 500.0f;
-    ui.mAcceleration_rpm_s = 500.0f;
+    ui.mAcceleration_rpm_s = 2000.0f;
     ui.mIsAbs_mA = 1500;
 
     runner.run(1.5f, 0.0f);
@@ -56,7 +56,7 @@ TEST_CASE("ClosedLoop step response")
     ui.mMode = static_cast<uint8_t>(app::Control::Mode::CLOSEDLOOP);
     ui.mEnable = 1;
     ui.targetSpeed_rpm = 500.0f;
-    ui.mAcceleration_rpm_s = 500.0f;
+    ui.mAcceleration_rpm_s = 5000.0f;
     ui.mIsAbs_mA = 1500;
 
     runner.run(0.3f, 0.0f);
@@ -93,15 +93,20 @@ TEST_CASE("Obserever Test", "[debug]")
 
     sim::SimpleLoad load;
     sim::SimRunner runner(sim::motors::motor1, load, "Observer_test.csv");
+    auto& control = runner.getControl();
 
     auto& ui = runner.getUi();
     ui.mMode = static_cast<uint8_t>(app::Control::Mode::CLOSEDLOOP);
     ui.mEnable = 1;
     ui.targetSpeed_rpm = 500.0f;
-    ui.mAcceleration_rpm_s = 500.0f;
+    ui.mAcceleration_rpm_s = 5000.0f;
     ui.mIsAbs_mA = 1500;
 
     runner.run(0.3f, 0.0f);
+    float observerError_deg = math::compute_angle_error(control.getEmkObserverTheta_rad(),
+                                                        control.getEncoderTheta_rad()) *
+                              (180.0f / std::numbers::pi_v<float>);
+    CHECK(observerError_deg == Catch::Approx(0.0f).margin(5.0f));
 
     sim::MotorState finalState = runner.getFinalState();
 
@@ -111,4 +116,8 @@ TEST_CASE("Obserever Test", "[debug]")
 
     ui.targetSpeed_rpm = 700.0f;
     runner.run(0.3f, 0.0f);
+    observerError_deg = math::compute_angle_error(control.getEmkObserverTheta_rad(),
+                                                  control.getEncoderTheta_rad()) *
+                        (180.0f / std::numbers::pi_v<float>);
+    CHECK(observerError_deg == Catch::Approx(0.0f).margin(5.0f));
 }

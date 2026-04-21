@@ -83,6 +83,16 @@ class SimRunner
         }
     }
 
+    app::Control& getControl()
+    {
+        return mControl;
+    }
+
+    MotorModel& getMotor()
+    {
+        return mMotor;
+    }
+
     // Access to the UI so tests can send commands
     app::UserInterface& getUi()
     {

@@ -8,6 +8,7 @@
 #include "interfaces.hpp"
 #include "motor_params.hpp"
 #include "open_loop_sensor.hpp"
+#include "ramp_generator.hpp"
 #include "sensor_selector.hpp"
 #include "svm.hpp"
 #include "transform.hpp"
@@ -38,15 +39,15 @@ class Control
                      UserInterface& ui)
         : mAdcSense(adc_sense), mInverter(inverter), mGateEnable(gate_enable),
           mMotorParams(motor_params), mFoc(motor_params), mUi(ui),
-          mOpenLoopSensor(
-              1.0f / 20000.0f, mAcceleration_rad_Hz2, mOmegaRef_rad_Hz, mMotorEnabled_bool),
+          mOpenLoopSensor(1.0f / 20000.0f, mOmegaRef_rad_Hz, mMotorEnabled_bool),
           mEncoderSensor(encoder,
                          1.0f / 20000.0f,
                          motor_params.polePairs,
                          2000.0f,
                          motor_params.encoderOffset_ticks),
           mEmkObserver(1.0f / 20000.0f, motor_params),
-          mSensorSelector(mOpenLoopSensor, mEncoderSensor, mEmkObserver), mFaultManager()
+          mSensorSelector(mOpenLoopSensor, mEncoderSensor, mEmkObserver), mFaultManager(),
+          mSpeedRamp(1.0f / 20000.0f)
     {
         mUdcBus_V = mAdcSense.read_bus_voltage();
         mTemp_C = mAdcSense.read_temperature_celsius();
@@ -132,6 +133,16 @@ class Control
     {
         readUserCommands();
 
+        if (mMotorEnabled_bool)
+        {
+            mOmegaRef_rad_Hz = mSpeedRamp.update(mTargetOmega_rad_Hz, mAcceleration_rad_Hz2);
+        }
+        else
+        {
+            mSpeedRamp.reset(0.0f);
+            mOmegaRef_rad_Hz = 0.0f;
+        }
+
         PhaseCurrents currents = mAdcSense.read_amps();
         mUdcBus_V = mAdcSense.read_bus_voltage();
         mUsLimit_V = mUdcBus_V * math::INV_SQRT_3;
@@ -154,7 +165,7 @@ class Control
             if (!mMotorEnabled_bool)
             {
                 mFoc.resetFoc();
-                mSensorSelector.updateAllSensors(); // Keep states reset/aligned
+                mSensorSelector.updateAllSensors();
                 return;
             }
         }
@@ -186,6 +197,7 @@ class Control
                     mOmegaRef_rad_Hz, activeOmega_rad_Hz, -mIsAbs_A, mIsAbs_A, mMotorEnabled_bool);
             }
         }
+
         else if (mMode == Mode::AUTOSETUP)
         {
             // Implementation pending
@@ -235,7 +247,7 @@ class Control
             }
         }
 
-        mOmegaRef_rad_Hz =
+        mTargetOmega_rad_Hz =
             math::mechRpmToElecRadPerSec(mUi.targetSpeed_rpm, mMotorParams.polePairs);
         mAcceleration_rad_Hz2 =
             math::mechRpmToElecRadPerSec(mUi.mAcceleration_rpm_s, mMotorParams.polePairs);
@@ -278,8 +290,10 @@ class Control
     FOC mFoc;
     Transforms mTransforms;
     FaultManager mFaultManager;
+    RampGenerator mSpeedRamp;
 
     // Control Variables
+    float mTargetOmega_rad_Hz{0.0f};
     float mOmegaRef_rad_Hz{0.0f};
     float mIdRef_A{0.0f};
     float mIqRef_A{0.0f};

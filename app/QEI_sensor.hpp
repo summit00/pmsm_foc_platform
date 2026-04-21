@@ -103,7 +103,7 @@ class EncoderSensor : public ISensor
     float mTheta_rad{0.0f};
     float mThetaOld_rad{0.0f};
     float mOmega_rad_Hz{0.0f};
-    float mFilterAlpha_coeff{0.01f};
+    float mFilterAlpha_coeff{0.05f};
 };
 
 } // namespace app

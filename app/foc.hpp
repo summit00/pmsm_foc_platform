@@ -4,7 +4,6 @@
 #include "pi_controller.hpp"
 #include "precontrol.hpp"
 #include "runtime_measurement.hpp"
-#include "theta_generator.hpp"
 #include "transform.hpp"
 #include <algorithm>
 #include <cmath>
