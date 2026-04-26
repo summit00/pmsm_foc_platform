@@ -15,8 +15,11 @@ class AutoSetup
     enum class State : uint8_t
     {
         IDLE,
-        MEASURE_RS,
-        MEASURE_LS,
+        RS_RAMP_UP,
+        RS_MEASURE,
+        RS_RAMP_DOWN,
+        LS_MEASURE,
+        LS_RAMP_DOWN,
         FINISHED
     };
 
@@ -27,22 +30,44 @@ class AutoSetup
 
     std::tuple<float, float> run(float Id_A, float Iq_A, float UdApplied_V, float UsLimit_V)
     {
+        float IdRef_A = 0.0f;
         switch (mState)
         {
-            case State::MEASURE_RS:
-            {
-                float IdRef_A = measureRs(Id_A, UdApplied_V);
+            case State::RS_RAMP_UP:
+                if (rampCurrent(mTargetCurrent_A, 2.0f, IdRef_A))
+                {
+                    mState = State::RS_MEASURE;
+                }
+                return mFoc.runCurrentControl(IdRef_A, 0.0f, Id_A, Iq_A, 0.0f, UsLimit_V, true);
 
-                auto [ud, uq] =
-                    mFoc.runCurrentControl(IdRef_A, 0.0f, Id_A, Iq_A, 0.0f, UsLimit_V, true);
-                return {ud, uq};
-            }
+            case State::RS_MEASURE:
+                if (measureRs(Id_A, UdApplied_V))
+                {
+                    mState = State::RS_RAMP_DOWN;
+                }
+                return mFoc.runCurrentControl(
+                    mTargetCurrent_A, 0.0f, Id_A, Iq_A, 0.0f, UsLimit_V, true);
 
-            case State::MEASURE_LS:
-            {
-                float ud_inj = measureLs(Id_A);
-                return {ud_inj, 0.0f};
-            }
+            case State::RS_RAMP_DOWN:
+                if (rampCurrent(0.0f, 5.0f, IdRef_A))
+                {
+                    mState = State::LS_MEASURE;
+                }
+                return mFoc.runCurrentControl(IdRef_A, 0.0f, Id_A, Iq_A, 0.0f, UsLimit_V, true);
+
+            case State::LS_MEASURE:
+                if (measureLs(Id_A))
+                {
+                    mState = State::LS_RAMP_DOWN;
+                }
+                return {mLastUdCommand_V, 0.0f};
+
+            case State::LS_RAMP_DOWN:
+                if (rampVoltageDown())
+                {
+                    mState = State::FINISHED;
+                }
+                return {mLastUdCommand_V, 0.0f};
 
             default:
                 return {0.0f, 0.0f};
@@ -52,7 +77,9 @@ class AutoSetup
     void startAutoSetup(float IsAbs_A)
     {
         mTargetCurrent_A = IsAbs_A;
-        mState = State::MEASURE_RS;
+        mInjectionVoltage_V = 0.0f;
+        mTime_s = 0.0f;
+        mState = State::RS_RAMP_UP;
         resetPhase();
     }
 
@@ -66,71 +93,82 @@ class AutoSetup
     }
 
   private:
-    float measureRs(float Id_A, float Ud_V)
+    bool rampCurrent(float target_A, float rampRate_A_Hz, float& id_ref_out_A)
     {
-        float IdRef_A = mRamp.update(mTargetCurrent_A, 2.0f);
-        if (std::abs(IdRef_A - mTargetCurrent_A) < 0.01f)
-        {
-            if (++mTimer > 1000)
-            {
-                mUdSum += Ud_V;
-                mIdSum += Id_A;
-                if (++mSamples >= 1000)
-                {
-                    mParams.Rs_ohm = mUdSum / mIdSum;
-                    mState = State::MEASURE_LS;
-                    resetPhase();
-                }
-            }
-        }
-        return IdRef_A;
+        id_ref_out_A = mRamp.update(target_A, rampRate_A_Hz);
+        return std::abs(id_ref_out_A - target_A) < 0.01f;
     }
 
-    float measureLs(float Id_A)
+    bool measureRs(float Id_A, float Ud_V)
     {
-        constexpr float injectionFreq_Hz = 500.0f;
-        constexpr float omegaInjection_rad_Hz = math::TWO_PI * injectionFreq_Hz;
+
+        if (++mTimer < 2000)
+            return false;
+
+        mUdSum += Ud_V;
+        mIdSum += Id_A;
+
+        if (++mSamples >= 2000)
+        {
+
+            mParams.Rs_ohm = mUdSum / mIdSum;
+            resetPhase();
+            return true;
+        }
+        return false;
+    }
+
+    bool rampVoltageDown()
+    {
+        constexpr float omegaInjection_rad_Hz = math::TWO_PI * 500.0f;
+
+        if (++mTimer > 200)
+        {
+            mTimer = 0;
+            mInjectionVoltage_V = std::max(0.0f, mInjectionVoltage_V - 0.1f);
+        }
+
+        mTime_s += mDt_s;
+        mLastUdCommand_V = mInjectionVoltage_V * math::sin(omegaInjection_rad_Hz * mTime_s);
+
+        return (mInjectionVoltage_V <= 0.0f); // Finished when voltage is gone
+    }
+
+    bool measureLs(float Id_A)
+    {
+        constexpr float omega_rad_Hz = math::TWO_PI * 500.0f;
 
         if (mInjectionVoltage_V == 0.0f)
         {
             mInjectionVoltage_V = mParams.Rs_ohm * mTargetCurrent_A;
         }
 
-        if (mDecayCounter_ticks < 2000)
-        {
-            mDecayCounter_ticks++;
-            mMeasuredCurrentPeak_A = 0.0f;
-            return 0.0f;
-        }
-
         mTime_s += mDt_s;
-        const float ud_command_V = mInjectionVoltage_V * math::sin(omegaInjection_rad_Hz * mTime_s);
+        mLastUdCommand_V = mInjectionVoltage_V * math::sin(omega_rad_Hz * mTime_s);
         mMeasuredCurrentPeak_A = std::max(mMeasuredCurrentPeak_A, std::abs(Id_A));
 
         if (mSamples == 0)
         {
             handleVoltageSearch();
-            return ud_command_V;
+            return false;
         }
 
         if (++mSamples > 4000)
         {
-            // Calculate Impedance Magnitude (|Z| = V / I)
-            // Pythagorean Theorem: L = sqrt(Z^2 - R^2) / omega
             const float reactance_ohm =
                 std::sqrt(std::max(0.0f,
                                    math::square(mInjectionVoltage_V / mMeasuredCurrentPeak_A) -
                                        math::square(mParams.Rs_ohm)));
-            const float inductance_H = reactance_ohm / omegaInjection_rad_Hz;
+            const float inductance_H = reactance_ohm / omega_rad_Hz;
 
             mParams.Ld_H = inductance_H;
             mParams.Lq_H = inductance_H;
 
-            mState = State::FINISHED;
             resetPhase();
+            return true;
         }
 
-        return ud_command_V;
+        return false;
     }
 
     void handleVoltageSearch()
@@ -156,9 +194,7 @@ class AutoSetup
         mSamples = 0;
         mUdSum = 0;
         mIdSum = 0;
-        mTime_s = 0;
         mMeasuredCurrentPeak_A = 0;
-        mInjectionVoltage_V = 0.0f;
         mDecayCounter_ticks = 0;
     }
 
@@ -169,5 +205,6 @@ class AutoSetup
     float mDt_s, mTargetCurrent_A{0}, mUdSum{0}, mIdSum{0}, mTime_s{0}, mMeasuredCurrentPeak_A{0};
     float mInjectionVoltage_V{0.0f};
     uint32_t mTimer{0}, mSamples{0}, mDecayCounter_ticks{0};
+    float mLastUdCommand_V{0.0f};
 };
 } // namespace app
