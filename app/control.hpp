@@ -1,6 +1,7 @@
 #pragma once
 
 #include "QEI_sensor.hpp"
+#include "auto_setup.hpp"
 #include "dq_limiter.hpp"
 #include "emk_observer.hpp"
 #include "fault_manager.hpp"
@@ -129,11 +130,26 @@ class Control
         return mEmkObserver.getTheta_rad();
     }
 
+    float getRs_ohm() const
+    {
+        return mMotorParams.Rs_ohm;
+    }
+
+    float getLd_H() const
+    {
+        return mMotorParams.Ld_H;
+    }
+
+    float getLq_H() const
+    {
+        return mMotorParams.Lq_H;
+    }
+
     void run_isr()
     {
         readUserCommands();
 
-        if (mMotorEnabled_bool)
+        if (mMotorEnabled_bool && mMode != Mode::AUTOSETUP)
         {
             mOmegaRef_rad_Hz = mSpeedRamp.update(mTargetOmega_rad_Hz, mAcceleration_rad_Hz2);
         }
@@ -198,26 +214,63 @@ class Control
             }
         }
 
+        // Inside control.hpp -> run_isr() -> Mode::AUTOSETUP block
+
         else if (mMode == Mode::AUTOSETUP)
         {
-            // Implementation pending
+            mSensorSelector.selectSensor(SensorSelector::SensorType::OpenLoop);
+
+            if (mAutoSetup.getState() == AutoSetup::State::IDLE)
+            {
+                mAutoSetup.start(mIsAbs_A);
+            }
+
+            // This now handles RS and then the combined L measurement
+            auto [outD, outQ, isVoltage] = mAutoSetup.run(mId_A, mIq_A, mUd_V);
+
+            if (isVoltage) // Inductance Phase
+            {
+                mUd_V = outD;
+                mUq_V = outQ;
+                mIdRef_A = 0.0f;
+                mIqRef_A = 0.0f;
+            }
+            else // Resistance Phase
+            {
+                mIdRef_A = outD;
+                mIqRef_A = outQ;
+                std::tie(mUd_V, mUq_V) = mFoc.runCurrentControl(
+                    mIdRef_A, mIqRef_A, mId_A, mIq_A, 0.0f, -mUsLimit_V, mUsLimit_V, true);
+            }
+
+            if (mAutoSetup.isFinished())
+            {
+                // Re-calculate gains using the new Rs and L (Ld=Lq)
+                mFoc.setCurrentControlGains();
+            }
         }
 
-        std::tie(mUd_V, mUq_V) = mFoc.runCurrentControl(mIdRef_A,
-                                                        mIqRef_A,
-                                                        mId_A,
-                                                        mIq_A,
-                                                        activeOmega_rad_Hz,
-                                                        -mUsLimit_V,
-                                                        mUsLimit_V,
-                                                        mMotorEnabled_bool);
+        if (mMode != Mode::AUTOSETUP)
+        {
+            std::tie(mUd_V, mUq_V) = mFoc.runCurrentControl(mIdRef_A,
+                                                            mIqRef_A,
+                                                            mId_A,
+                                                            mIq_A,
+                                                            activeOmega_rad_Hz,
+                                                            -mUsLimit_V,
+                                                            mUsLimit_V,
+                                                            mMotorEnabled_bool);
+        }
 
         std::tie(mUd_V, mUq_V) = DQLimiter::applyLimit(mUd_V, mUq_V, mUsLimit_V);
 
         std::tie(mUalpha_V, mUbeta_V) = mTransforms.inversePark(mUd_V, mUq_V, activeTheta_rad);
         auto [Va_V, Vb_V, Vc_V] = mTransforms.inverseClarke(mUalpha_V, mUbeta_V);
 
-        std::tie(Va_V, Vb_V, Vc_V) = spaceVectorModulation(Va_V, Vb_V, Vc_V);
+        if (mMode != Mode::AUTOSETUP)
+        {
+            std::tie(Va_V, Vb_V, Vc_V) = spaceVectorModulation(Va_V, Vb_V, Vc_V);
+        }
 
         mInverter.set_phase_voltages(Va_V, Vb_V, Vc_V, mUdcBus_V, mMotorEnabled_bool);
 
@@ -291,6 +344,7 @@ class Control
     Transforms mTransforms;
     FaultManager mFaultManager;
     RampGenerator mSpeedRamp;
+    AutoSetup mAutoSetup{mMotorParams, 1.0f / 20000.0f};
 
     // Control Variables
     float mTargetOmega_rad_Hz{0.0f};
