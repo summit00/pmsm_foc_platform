@@ -1,4 +1,5 @@
 #pragma once
+#include "foc.hpp" // Added to access FOC
 #include "math.hpp"
 #include "motor_params.hpp"
 #include "ramp_generator.hpp"
@@ -15,33 +16,42 @@ class AutoSetup
     {
         IDLE,
         MEASURE_RS,
-        MEASURE_L, // Combined inductance identification
+        MEASURE_LS,
         FINISHED
     };
 
-    explicit AutoSetup(MotorParams& params, float dt_s) : mParams(params), mRamp(dt_s), mDt(dt_s)
+    explicit AutoSetup(MotorParams& params, FOC& foc, float dt_s)
+        : mParams(params), mFoc(foc), mRamp(dt_s), mDt_s(dt_s)
     {
     }
 
-    std::tuple<float, float, bool> run(float id_meas, float iq_meas, float ud_meas)
+    std::tuple<float, float> run(float Id_A, float Iq_A, float UdApplied_V, float UsLimit_V)
     {
         switch (mState)
         {
             case State::MEASURE_RS:
-                return {runRs(id_meas, ud_meas), 0.0f, false};
+            {
+                float IdRef_A = measureRs(Id_A, UdApplied_V);
 
-            case State::MEASURE_L:
-                // We inject only into the D-axis for general inductance
-                return {runInductance(id_meas), 0.0f, true};
+                auto [ud, uq] =
+                    mFoc.runCurrentControl(IdRef_A, 0.0f, Id_A, Iq_A, 0.0f, UsLimit_V, true);
+                return {ud, uq};
+            }
+
+            case State::MEASURE_LS:
+            {
+                float ud_inj = measureLs(Id_A);
+                return {ud_inj, 0.0f};
+            }
 
             default:
-                return {0.0f, 0.0f, false};
+                return {0.0f, 0.0f};
         }
     }
 
-    void start(float testCurrent_A)
+    void startAutoSetup(float IsAbs_A)
     {
-        mTargetCurrent_A = testCurrent_A;
+        mTargetCurrent_A = IsAbs_A;
         mState = State::MEASURE_RS;
         resetPhase();
     }
@@ -56,69 +66,88 @@ class AutoSetup
     }
 
   private:
-    float runRs(float id_meas, float ud_meas)
+    float measureRs(float Id_A, float Ud_V)
     {
-        float ref = mRamp.update(mTargetCurrent_A, 2.0f);
-        if (std::abs(ref - mTargetCurrent_A) < 0.01f)
+        float IdRef_A = mRamp.update(mTargetCurrent_A, 2.0f);
+        if (std::abs(IdRef_A - mTargetCurrent_A) < 0.01f)
         {
             if (++mTimer > 1000)
             {
-                mUdSum += ud_meas;
-                mIdSum += id_meas;
+                mUdSum += Ud_V;
+                mIdSum += Id_A;
                 if (++mSamples >= 1000)
                 {
                     mParams.Rs_ohm = mUdSum / mIdSum;
-                    mState = State::MEASURE_L; // Transition to single L measurement
+                    mState = State::MEASURE_LS;
                     resetPhase();
                 }
             }
         }
-        return ref;
+        return IdRef_A;
     }
 
-    float runInductance(float i_meas)
+    float measureLs(float Id_A)
     {
-        constexpr float f_inj = 500.0f;
-        constexpr float w_inj = 2.0f * math::PI * f_inj;
+        constexpr float injectionFreq_Hz = 500.0f;
+        constexpr float omegaInjection_rad_Hz = math::TWO_PI * injectionFreq_Hz;
 
-        // Start with a voltage guess based on Rs
-        if (mVoltageAmplitude == 0.0f)
+        if (mInjectionVoltage_V == 0.0f)
         {
-            mVoltageAmplitude = mParams.Rs_ohm * mTargetCurrent_A;
+            mInjectionVoltage_V = mParams.Rs_ohm * mTargetCurrent_A;
         }
 
-        mTime += mDt;
-        float v_cmd = mVoltageAmplitude * math::sin(w_inj * mTime);
-        mCurrentPk = std::max(mCurrentPk, std::abs(i_meas));
-
-        // Adaptive search for target current amplitude
-        if (++mSettleCount > 200)
+        if (mDecayCounter_ticks < 2000)
         {
-            mSettleCount = 0;
-            if (mCurrentPk < (mTargetCurrent_A * 0.95f))
+            mDecayCounter_ticks++;
+            mMeasuredCurrentPeak_A = 0.0f;
+            return 0.0f;
+        }
+
+        mTime_s += mDt_s;
+        const float ud_command_V = mInjectionVoltage_V * math::sin(omegaInjection_rad_Hz * mTime_s);
+        mMeasuredCurrentPeak_A = std::max(mMeasuredCurrentPeak_A, std::abs(Id_A));
+
+        if (mSamples == 0)
+        {
+            handleVoltageSearch();
+            return ud_command_V;
+        }
+
+        if (++mSamples > 4000)
+        {
+            // Calculate Impedance Magnitude (|Z| = V / I)
+            // Pythagorean Theorem: L = sqrt(Z^2 - R^2) / omega
+            const float reactance_ohm =
+                std::sqrt(std::max(0.0f,
+                                   math::square(mInjectionVoltage_V / mMeasuredCurrentPeak_A) -
+                                       math::square(mParams.Rs_ohm)));
+            const float inductance_H = reactance_ohm / omegaInjection_rad_Hz;
+
+            mParams.Ld_H = inductance_H;
+            mParams.Lq_H = inductance_H;
+
+            mState = State::FINISHED;
+            resetPhase();
+        }
+
+        return ud_command_V;
+    }
+
+    void handleVoltageSearch()
+    {
+        if (++mTimer > 200)
+        {
+            mTimer = 0;
+            if (mMeasuredCurrentPeak_A < (mTargetCurrent_A * 0.95f))
             {
-                mVoltageAmplitude += 0.05f;
-                mCurrentPk = 0;
-                mSamples = 0;
+                mInjectionVoltage_V += 0.05f;
+                mMeasuredCurrentPeak_A = 0.0f;
             }
             else
             {
-                if (++mSamples > 4000)
-                {
-                    float z_mag = mVoltageAmplitude / mCurrentPk;
-                    float r_sq = mParams.Rs_ohm * mParams.Rs_ohm;
-                    float L = std::sqrt(std::max(0.0f, z_mag * z_mag - r_sq)) / w_inj;
-
-                    // Apply identified L to both D and Q axes
-                    mParams.Ld_H = L;
-                    mParams.Lq_H = L;
-
-                    mState = State::FINISHED;
-                    resetPhase();
-                }
+                mSamples = 1;
             }
         }
-        return v_cmd;
     }
 
     void resetPhase()
@@ -127,17 +156,18 @@ class AutoSetup
         mSamples = 0;
         mUdSum = 0;
         mIdSum = 0;
-        mTime = 0;
-        mCurrentPk = 0;
-        mVoltageAmplitude = 0.0f;
-        mSettleCount = 0;
+        mTime_s = 0;
+        mMeasuredCurrentPeak_A = 0;
+        mInjectionVoltage_V = 0.0f;
+        mDecayCounter_ticks = 0;
     }
 
     MotorParams& mParams;
+    FOC& mFoc;
     RampGenerator mRamp;
     State mState = State::IDLE;
-    float mDt, mTargetCurrent_A{0}, mUdSum{0}, mIdSum{0}, mTime{0}, mCurrentPk{0};
-    float mVoltageAmplitude{0.0f};
-    uint32_t mTimer{0}, mSamples{0}, mSettleCount{0};
+    float mDt_s, mTargetCurrent_A{0}, mUdSum{0}, mIdSum{0}, mTime_s{0}, mMeasuredCurrentPeak_A{0};
+    float mInjectionVoltage_V{0.0f};
+    uint32_t mTimer{0}, mSamples{0}, mDecayCounter_ticks{0};
 };
 } // namespace app

@@ -1,4 +1,5 @@
 #pragma once
+#include "dq_limiter.hpp"
 #include "interfaces.hpp"
 #include "motor_params.hpp"
 #include "pi_controller.hpp"
@@ -26,17 +27,18 @@ class FOC
                                                float Id_A,
                                                float Iq_A,
                                                float omega_rad_Hz,
-                                               float outMin,
-                                               float outMax,
+                                               float UsLimit_V,
                                                bool motor_enabled)
     {
         auto [Ud_ff, Uq_ff] = precontrol.compute(IdRef_A, IqRef_A, omega_rad_Hz);
 
-        auto Ud_pi_V = pi_d.compute(IdRef_A, Id_A, outMin, outMax);
-        auto Uq_pi_V = pi_q.compute(IqRef_A, Iq_A, outMin, outMax);
+        auto Ud_pi_V = pi_d.compute(IdRef_A, Id_A, -UsLimit_V, UsLimit_V);
+        auto Uq_pi_V = pi_q.compute(IqRef_A, Iq_A, -UsLimit_V, UsLimit_V);
 
-        float Ud = std::clamp(Ud_pi_V + Ud_ff, outMin, outMax);
-        float Uq = std::clamp(Uq_pi_V + Uq_ff, outMin, outMax);
+        float Ud = std::clamp(Ud_pi_V + Ud_ff, -UsLimit_V, UsLimit_V);
+        float Uq = std::clamp(Uq_pi_V + Uq_ff, -UsLimit_V, UsLimit_V);
+
+        std::tie(Ud, Uq) = DQLimiter::applyLimit(Ud, Uq, UsLimit_V);
 
         if (!motor_enabled)
         {

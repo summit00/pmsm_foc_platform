@@ -2,7 +2,6 @@
 
 #include "QEI_sensor.hpp"
 #include "auto_setup.hpp"
-#include "dq_limiter.hpp"
 #include "emk_observer.hpp"
 #include "fault_manager.hpp"
 #include "foc.hpp"
@@ -214,40 +213,18 @@ class Control
             }
         }
 
-        // Inside control.hpp -> run_isr() -> Mode::AUTOSETUP block
-
         else if (mMode == Mode::AUTOSETUP)
         {
             mSensorSelector.selectSensor(SensorSelector::SensorType::OpenLoop);
 
             if (mAutoSetup.getState() == AutoSetup::State::IDLE)
             {
-                mAutoSetup.start(mIsAbs_A);
+                mAutoSetup.startAutoSetup(mIsAbs_A);
             }
 
-            // This now handles RS and then the combined L measurement
-            auto [outD, outQ, isVoltage] = mAutoSetup.run(mId_A, mIq_A, mUd_V);
-
-            if (isVoltage) // Inductance Phase
-            {
-                mUd_V = outD;
-                mUq_V = outQ;
-                mIdRef_A = 0.0f;
-                mIqRef_A = 0.0f;
-            }
-            else // Resistance Phase
-            {
-                mIdRef_A = outD;
-                mIqRef_A = outQ;
-                std::tie(mUd_V, mUq_V) = mFoc.runCurrentControl(
-                    mIdRef_A, mIqRef_A, mId_A, mIq_A, 0.0f, -mUsLimit_V, mUsLimit_V, true);
-            }
-
-            if (mAutoSetup.isFinished())
-            {
-                // Re-calculate gains using the new Rs and L (Ld=Lq)
-                mFoc.setCurrentControlGains();
-            }
+            auto [ud, uq] = mAutoSetup.run(mId_A, mIq_A, mUd_V, mUsLimit_V);
+            mUd_V = ud;
+            mUq_V = uq;
         }
 
         if (mMode != Mode::AUTOSETUP)
@@ -257,12 +234,9 @@ class Control
                                                             mId_A,
                                                             mIq_A,
                                                             activeOmega_rad_Hz,
-                                                            -mUsLimit_V,
                                                             mUsLimit_V,
                                                             mMotorEnabled_bool);
         }
-
-        std::tie(mUd_V, mUq_V) = DQLimiter::applyLimit(mUd_V, mUq_V, mUsLimit_V);
 
         std::tie(mUalpha_V, mUbeta_V) = mTransforms.inversePark(mUd_V, mUq_V, activeTheta_rad);
         auto [Va_V, Vb_V, Vc_V] = mTransforms.inverseClarke(mUalpha_V, mUbeta_V);
@@ -344,7 +318,7 @@ class Control
     Transforms mTransforms;
     FaultManager mFaultManager;
     RampGenerator mSpeedRamp;
-    AutoSetup mAutoSetup{mMotorParams, 1.0f / 20000.0f};
+    AutoSetup mAutoSetup{mMotorParams, mFoc, 1.0f / 20000.0f};
 
     // Control Variables
     float mTargetOmega_rad_Hz{0.0f};
