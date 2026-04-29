@@ -181,6 +181,7 @@ class Control
             {
                 mFoc.resetFoc();
                 mSensorSelector.updateAllSensors();
+                mAutoSetup.reset();
                 return;
             }
         }
@@ -213,7 +214,7 @@ class Control
             }
         }
 
-        else if (mMode == Mode::AUTOSETUP)
+        else if (mMode == Mode::AUTOSETUP and mMotorEnabled_bool)
         {
             mSensorSelector.selectSensor(SensorSelector::SensorType::OpenLoop);
 
@@ -272,6 +273,8 @@ class Control
             {
                 mSensorSelector.selectSensor(SensorSelector::SensorType::Encoder);
             }
+
+            mAutoSetup.reset();
         }
 
         mTargetOmega_rad_Hz =
