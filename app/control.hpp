@@ -223,7 +223,7 @@ class Control
                 mAutoSetup.startAutoSetup(mIsAbs_A);
             }
 
-            auto [ud, uq] = mAutoSetup.run(mId_A, mIq_A, mUd_V, mUsLimit_V);
+            auto [ud, uq] = mAutoSetup.run(mId_A, mIq_A, mUd_V, mUq_V, mUsLimit_V);
             mUd_V = ud;
             mUq_V = uq;
         }
@@ -241,11 +241,6 @@ class Control
 
         std::tie(mUalpha_V, mUbeta_V) = mTransforms.inversePark(mUd_V, mUq_V, activeTheta_rad);
         auto [Va_V, Vb_V, Vc_V] = mTransforms.inverseClarke(mUalpha_V, mUbeta_V);
-
-        if (mMode != Mode::AUTOSETUP)
-        {
-            std::tie(Va_V, Vb_V, Vc_V) = spaceVectorModulation(Va_V, Vb_V, Vc_V);
-        }
 
         mInverter.set_phase_voltages(Va_V, Vb_V, Vc_V, mUdcBus_V, mMotorEnabled_bool);
 

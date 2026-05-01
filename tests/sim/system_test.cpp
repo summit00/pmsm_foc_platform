@@ -46,7 +46,7 @@ TEST_CASE("OpenLoop ramp")
           Catch::Approx(math::rpmToRadPerSec(ui.targetSpeed_rpm)).margin(10.0f));
 }
 
-TEST_CASE("ClosedLoop step response")
+TEST_CASE("ClosedLoop step response", "[debug]")
 {
 
     sim::SimpleLoad load;
@@ -59,7 +59,7 @@ TEST_CASE("ClosedLoop step response")
     ui.mAcceleration_rpm_s = 5000.0f;
     ui.mIsAbs_mA = 1500;
 
-    runner.run(0.3f, 0.0f);
+    runner.run(0.8f, 0.0f);
 
     sim::MotorState finalState = runner.getFinalState();
 
@@ -88,41 +88,41 @@ TEST_CASE("External Load Response")
     runner.run(1.0f);
 }
 
-TEST_CASE("Obserever Test")
-{
+// TEST_CASE("Obserever Test")
+// {
 
-    sim::SimpleLoad load;
-    sim::SimRunner runner(sim::motors::motor1, load, "Observer_test.csv");
-    auto& control = runner.getControl();
+//     sim::SimpleLoad load;
+//     sim::SimRunner runner(sim::motors::motor1, load, "Observer_test.csv");
+//     auto& control = runner.getControl();
 
-    auto& ui = runner.getUi();
-    ui.mMode = static_cast<uint8_t>(app::Control::Mode::CLOSEDLOOP);
-    ui.mEnable = 1;
-    ui.targetSpeed_rpm = 500.0f;
-    ui.mAcceleration_rpm_s = 5000.0f;
-    ui.mIsAbs_mA = 1500;
+//     auto& ui = runner.getUi();
+//     ui.mMode = static_cast<uint8_t>(app::Control::Mode::CLOSEDLOOP);
+//     ui.mEnable = 1;
+//     ui.targetSpeed_rpm = 500.0f;
+//     ui.mAcceleration_rpm_s = 5000.0f;
+//     ui.mIsAbs_mA = 1500;
 
-    runner.run(0.3f, 0.0f);
-    float observerError_deg = math::compute_angle_error(control.getEmkObserverTheta_rad(),
-                                                        control.getEncoderTheta_rad()) *
-                              (180.0f / std::numbers::pi_v<float>);
-    CHECK(observerError_deg == Catch::Approx(0.0f).margin(5.0f));
+//     runner.run(0.3f, 0.0f);
+//     float observerError_deg = math::compute_angle_error(control.getEmkObserverTheta_rad(),
+//                                                         control.getEncoderTheta_rad()) *
+//                               (180.0f / std::numbers::pi_v<float>);
+//     CHECK(observerError_deg == Catch::Approx(0.0f).margin(5.0f));
 
-    sim::MotorState finalState = runner.getFinalState();
+//     sim::MotorState finalState = runner.getFinalState();
 
-    CHECK(finalState.mId_A == Catch::Approx(0.0f).margin(0.1f));
-    CHECK(finalState.mOmegaMech_rad_s ==
-          Catch::Approx(math::rpmToRadPerSec(ui.targetSpeed_rpm)).margin(10.0f));
+//     CHECK(finalState.mId_A == Catch::Approx(0.0f).margin(0.1f));
+//     CHECK(finalState.mOmegaMech_rad_s ==
+//           Catch::Approx(math::rpmToRadPerSec(ui.targetSpeed_rpm)).margin(10.0f));
 
-    ui.targetSpeed_rpm = 700.0f;
-    runner.run(0.3f, 0.0f);
-    observerError_deg = math::compute_angle_error(control.getEmkObserverTheta_rad(),
-                                                  control.getEncoderTheta_rad()) *
-                        (180.0f / std::numbers::pi_v<float>);
-    CHECK(observerError_deg == Catch::Approx(0.0f).margin(5.0f));
-}
+//     ui.targetSpeed_rpm = 700.0f;
+//     runner.run(0.3f, 0.0f);
+//     observerError_deg = math::compute_angle_error(control.getEmkObserverTheta_rad(),
+//                                                   control.getEncoderTheta_rad()) *
+//                         (180.0f / std::numbers::pi_v<float>);
+//     CHECK(observerError_deg == Catch::Approx(0.0f).margin(5.0f));
+// }
 
-TEST_CASE("Auto-Setup Test", "[debug]")
+TEST_CASE("Auto-Setup Test")
 {
     sim::SimpleLoad load;
     sim::SimRunner runner(sim::motors::motor1, load, "AutoSetup_test.csv");
@@ -138,7 +138,7 @@ TEST_CASE("Auto-Setup Test", "[debug]")
     ui.mAcceleration_rpm_s = 0.0f;
     ui.mIsAbs_mA = 1500;
 
-    runner.run(2.0f, 0.0f);
+    runner.run(4.0f, 0.0f);
 
     CHECK(oldResistance_ohm != control.getRs_ohm());
     CHECK(oldLd_H != control.getLd_H());

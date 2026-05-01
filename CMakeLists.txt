@@ -24,6 +24,7 @@ if(PLATFORM STREQUAL "host")
     add_subdirectory(tests/sim)
 
 elseif(PLATFORM STREQUAL "stm32")
+    add_definitions(-DTARGET_STM32)
     include(${CMAKE_SOURCE_DIR}/cmake/stm32g431.cmake)
     add_subdirectory(hal)
     add_subdirectory(bsp)

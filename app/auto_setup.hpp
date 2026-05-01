@@ -2,6 +2,7 @@
 #include "foc.hpp"
 #include "math.hpp"
 #include "motor_params.hpp"
+#include "powerstage_config.hpp"
 #include "ramp_generator.hpp"
 #include <algorithm>
 #include <array>
@@ -31,18 +32,19 @@ class AutoSetup
     {
     }
 
-    std::tuple<float, float> run(float Id_A, float Iq_A, float UdApplied_V, float UsLimit_V)
+    std::tuple<float, float>
+    run(float Id_A, float Iq_A, float UdApplied_V, float UqApplied_V, float UsLimit_V)
     {
         float IdRef_A = 0.0f;
         switch (mState)
         {
             case State::IDLE:
+                mFoc.setCurrentControlGainsManual(0.5f, 0.01f);
                 return {0.0f, 0.0f};
 
             case State::RS_RAMP_UP:
             {
-                float stepTarget = mTargetCurrent_A * mStepMultipliers[mCurrentStep];
-                if (rampCurrent(stepTarget, 2.0f, IdRef_A))
+                if (rampCurrent(mTargetCurrent_A, 2.0f, IdRef_A))
                 {
                     mState = State::RS_MEASURE;
                 }
@@ -50,27 +52,13 @@ class AutoSetup
             }
 
             case State::RS_MEASURE:
-                if (measureRsStep(Id_A, UdApplied_V))
+                if (measureRs(Id_A, Iq_A, UdApplied_V, 0.0f))
                 {
-                    mCurrentStep++;
-                    if (mCurrentStep < 3)
-                    {
-                        mState = State::RS_RAMP_UP;
-                    }
-                    else
-                    {
-                        calculateRsRegression();
-                        mState = State::RS_RAMP_DOWN;
-                    }
+
+                    mState = State::RS_RAMP_DOWN;
                 }
                 return mFoc.runCurrentControl(
-                    mTargetCurrent_A * mStepMultipliers[std::min(mCurrentStep, (uint8_t)2)],
-                    0.0f,
-                    Id_A,
-                    Iq_A,
-                    0.0f,
-                    UsLimit_V,
-                    true);
+                    mTargetCurrent_A, 0.0f, Id_A, Iq_A, 0.0f, UsLimit_V, true);
 
             case State::RS_RAMP_DOWN:
                 if (rampCurrent(0.0f, 5.0f, IdRef_A))
@@ -134,53 +122,47 @@ class AutoSetup
         return std::abs(id_ref_out_A - target_A) < 0.01f;
     }
 
-    bool measureRsStep(float Id_A, float Ud_V)
+    bool measureRs(float Id_A, float Iq_A, float Ud_V, float Uq_V)
     {
-        // Wait 2000 cycles (settling) before measuring to ensure stability
         if (++mTimer < 15000)
             return false;
+
+        if (std::abs(Iq_A) > (mTargetCurrent_A * 0.05f))
+        {
+            resetPhase(); // Restart measurement if rotor moved
+            return false;
+        }
 
         mUdSum += Ud_V;
         mIdSum += Id_A;
 
-        if (++mSamples >= 5000)
+        if (++mSamples >= 10000)
         {
-            mMeasuredI[mCurrentStep] = mIdSum / mSamples;
-            mMeasuredU[mCurrentStep] = mUdSum / mSamples;
+            float meanI = mIdSum / mSamples;
+            float meanU = mUdSum / mSamples;
+
+            if (meanI < (mTargetCurrent_A * 0.90f))
+            {
+                resetPhase();
+                return false;
+            }
+
+            mParams.RTotal_ohm = meanU / meanI;
+            auto config = getPowerStageConfig();
+            mParams.Rs_ohm = mParams.RTotal_ohm - config.RtotalOffset_ohm;
             resetPhase();
             return true;
         }
         return false;
     }
 
-    void calculateRsRegression()
-    {
-        float sumI = 0, sumU = 0, sumIU = 0, sumI2 = 0;
-        constexpr float n = 3.0f;
-
-        for (int i = 0; i < 3; ++i)
-        {
-            sumI += mMeasuredI[i];
-            sumU += mMeasuredU[i];
-            sumIU += mMeasuredI[i] * mMeasuredU[i];
-            sumI2 += mMeasuredI[i] * mMeasuredI[i];
-        }
-
-        // Regression Formula: R = (n*ΣIU - ΣI*ΣU) / (n*ΣI² - (ΣI)²)
-        float denominator = (n * sumI2 - (sumI * sumI));
-        if (std::abs(denominator) > 1e-6f)
-        {
-            mParams.Rs_ohm = (n * sumIU - (sumI * sumU)) / denominator;
-        }
-    }
-
     bool measureLs(float Id_A)
     {
-        constexpr float omega_rad_Hz = 3141.592653589793f; // 2*PI*500
+        constexpr float omega_rad_Hz = 2.0f * math::PI * 1000.0f;
 
         if (mInjectionVoltage_V == 0.0f)
         {
-            mInjectionVoltage_V = mParams.Rs_ohm * mTargetCurrent_A;
+            mInjectionVoltage_V = mParams.RTotal_ohm * mTargetCurrent_A;
         }
 
         mTime_s += mDt_s;
@@ -193,12 +175,12 @@ class AutoSetup
             return false;
         }
 
-        if (++mSamples > 4000)
+        if (++mSamples > 10000)
         {
             const float reactance_ohm =
                 std::sqrt(std::max(0.0f,
                                    math::square(mInjectionVoltage_V / mMeasuredCurrentPeak_A) -
-                                       math::square(mParams.Rs_ohm)));
+                                       math::square(mParams.RTotal_ohm)));
             const float inductance_H = reactance_ohm / omega_rad_Hz;
 
             mParams.Ld_H = inductance_H;
@@ -229,7 +211,7 @@ class AutoSetup
 
     bool rampVoltageDown()
     {
-        constexpr float omegaInjection_rad_Hz = 3141.592653589793f; // 2*PI*500
+        constexpr float omegaInjection_rad_Hz = 2.0f * math::PI * 1000.0f;
         if (++mTimer > 200)
         {
             mTimer = 0;
@@ -255,9 +237,8 @@ class AutoSetup
     State mState = State::IDLE;
 
     uint8_t mCurrentStep{0};
-    const std::array<float, 3> mStepMultipliers{0.33f, 0.66f, 1.0f};
-    std::array<float, 3> mMeasuredI{0, 0, 0};
-    std::array<float, 3> mMeasuredU{0, 0, 0};
+    float mMeasuredI{};
+    float mMeasuredU{};
 
     float mDt_s, mTargetCurrent_A{0}, mUdSum{0}, mIdSum{0}, mTime_s{0}, mMeasuredCurrentPeak_A{0};
     float mInjectionVoltage_V{0.0f};
