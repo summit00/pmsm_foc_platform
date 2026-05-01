@@ -46,7 +46,7 @@ TEST_CASE("OpenLoop ramp")
           Catch::Approx(math::rpmToRadPerSec(ui.targetSpeed_rpm)).margin(10.0f));
 }
 
-TEST_CASE("ClosedLoop step response", "[debug]")
+TEST_CASE("ClosedLoop step response")
 {
 
     sim::SimpleLoad load;
@@ -59,7 +59,7 @@ TEST_CASE("ClosedLoop step response", "[debug]")
     ui.mAcceleration_rpm_s = 5000.0f;
     ui.mIsAbs_mA = 1500;
 
-    runner.run(0.8f, 0.0f);
+    runner.run(0.3f, 0.0f);
 
     sim::MotorState finalState = runner.getFinalState();
 

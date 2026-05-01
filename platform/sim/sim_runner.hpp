@@ -34,10 +34,12 @@ class SimRunner
 
           // Initialize App Parameters from Sim Parameters
           mAppMotorParams{simParams.Rs_ohm,
+                          simParams.Rs_ohm,                    
                           simParams.Ld_H,
                           simParams.Lq_H,
                           simParams.fluxPm_Wb,
-                          simParams.polePairs_count},
+                          simParams.polePairs_count,
+                          0},
 
           // Initialize Physics
           mMotor(simParams, mSolver, externalLoad), mLogger(logFilename),
