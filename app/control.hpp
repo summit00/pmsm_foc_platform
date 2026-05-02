@@ -124,6 +124,11 @@ class Control
         return mEncoderSensor.getTheta_rad();
     }
 
+    float getEncoderOmega_rad_Hz() const
+    {
+        return mEncoderSensor.getOmega_rad_Hz();
+    }
+
     float getEmkObserverTheta_rad() const
     {
         return mEmkObserver.getTheta_rad();
