@@ -7,13 +7,13 @@ namespace app
 class RampGenerator
 {
   public:
-    explicit RampGenerator(float dt_s) : mDt_s(dt_s)
+    explicit RampGenerator(float pwmPeriod_s) : mPwmPeriod_s(pwmPeriod_s)
     {
     }
 
     float update(float target, float acceleration)
     {
-        float maxStep = acceleration * mDt_s;
+        float maxStep = acceleration * mPwmPeriod_s;
 
         if (mCurrentValue < target)
         {
@@ -38,7 +38,7 @@ class RampGenerator
     }
 
   private:
-    float mDt_s;
+    float mPwmPeriod_s;
     float mCurrentValue{0.0f};
 };
 

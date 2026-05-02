@@ -36,18 +36,19 @@ class Control
                      IEnableOutput& gate_enable,
                      IEncoder& encoder,
                      MotorParams& motor_params,
-                     UserInterface& ui)
+                     UserInterface& ui,
+                     float pwmPeriod_s)
         : mAdcSense(adc_sense), mInverter(inverter), mGateEnable(gate_enable),
           mMotorParams(motor_params), mFoc(motor_params), mUi(ui),
-          mOpenLoopSensor(1.0f / 20000.0f, mOmegaRef_rad_Hz, mMotorEnabled_bool),
+          mOpenLoopSensor(pwmPeriod_s, mOmegaRef_rad_Hz, mMotorEnabled_bool),
           mEncoderSensor(encoder,
-                         1.0f / 20000.0f,
+                         pwmPeriod_s,
                          motor_params.polePairs,
-                         2000.0f,
+                         static_cast<float>(motor_params.encoderTicks),
                          motor_params.encoderOffset_ticks),
-          mEmkObserver(1.0f / 20000.0f, motor_params),
+          mEmkObserver(pwmPeriod_s, motor_params),
           mSensorSelector(mOpenLoopSensor, mEncoderSensor, mEmkObserver), mFaultManager(),
-          mSpeedRamp(1.0f / 20000.0f), mAutoSetup(mMotorParams, 1.0f / 20000.0f)
+          mSpeedRamp(pwmPeriod_s), mAutoSetup(mMotorParams, pwmPeriod_s)
     {
         mUdcBus_V = mAdcSense.read_bus_voltage();
         mTemp_C = mAdcSense.read_temperature_celsius();
@@ -64,9 +65,9 @@ class Control
         return mIqRef_A;
     }
 
-    float getOmegaRef_rpm() const
+    float getOmegaRef_rad_Hz() const
     {
-        return mOmegaRef_rad_Hz * (30.0f / std::numbers::pi_v<float>) / mMotorParams.polePairs;
+        return mOmegaRef_rad_Hz;
     }
 
     uint8_t getMode() const
@@ -119,6 +120,11 @@ class Control
         return mOpenLoopSensor.getTheta_rad();
     }
 
+    float getOpenLoopOmega_rad_Hz() const
+    {
+        return mOpenLoopSensor.getOmega_rad_Hz();
+    }
+
     float getEncoderTheta_rad() const
     {
         return mEncoderSensor.getTheta_rad();
@@ -129,9 +135,19 @@ class Control
         return mEncoderSensor.getOmega_rad_Hz();
     }
 
+    float getEncoderOmega_rad_Hz() const
+    {
+        return mEncoderSensor.getOmega_rad_Hz();
+    }
+
     float getEmkObserverTheta_rad() const
     {
         return mEmkObserver.getTheta_rad();
+    }
+
+    float getEmkObserverOmega_rad_Hz() const
+    {
+        return mEmkObserver.getOmega_rad_Hz();
     }
 
     float getRs_ohm() const

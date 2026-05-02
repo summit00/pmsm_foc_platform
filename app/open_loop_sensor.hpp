@@ -10,10 +10,10 @@ namespace app
 class OpenLoopSensor : public ISensor
 {
   public:
-    OpenLoopSensor(float dt_s,
+    OpenLoopSensor(float pwmPeriod_s,
                    const float& currentOmegaRef_rad_Hz,
                    const bool& motorEnabledRef_bool)
-        : mDt_s(dt_s), mOmegaRef(currentOmegaRef_rad_Hz),
+        : mPwmPeriod_s(pwmPeriod_s), mOmegaRef(currentOmegaRef_rad_Hz),
           mMotorEnabledRef_bool(motorEnabledRef_bool)
     {
     }
@@ -23,7 +23,7 @@ class OpenLoopSensor : public ISensor
         if (mMotorEnabledRef_bool)
         {
             // Directly integrate the reference omega to find theta
-            mTheta_rad += mOmegaRef * mDt_s;
+            mTheta_rad += mOmegaRef * mPwmPeriod_s;
 
             // Wrap angle between -PI and PI
             if (mTheta_rad > math::PI)
@@ -53,7 +53,7 @@ class OpenLoopSensor : public ISensor
     }
 
   private:
-    float mDt_s;
+    float mPwmPeriod_s;
     const float& mOmegaRef;
     const bool& mMotorEnabledRef_bool;
     float mTheta_rad{0.0f};

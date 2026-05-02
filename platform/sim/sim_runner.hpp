@@ -34,7 +34,7 @@ class SimRunner
 
           // Initialize App Parameters from Sim Parameters
           mAppMotorParams{simParams.Rs_ohm,
-                          simParams.Rs_ohm,                    
+                          simParams.Rs_ohm,
                           simParams.Ld_H,
                           simParams.Lq_H,
                           simParams.fluxPm_Wb,
@@ -49,7 +49,13 @@ class SimRunner
           mSimGateEnable(),
 
           // Initialize the actual Controller!
-          mControl(mSimAdc, mSimInverter, mSimGateEnable, mSimEncoder, mAppMotorParams, mUi)
+          mControl(mSimAdc,
+                   mSimInverter,
+                   mSimGateEnable,
+                   mSimEncoder,
+                   mAppMotorParams,
+                   mUi,
+                   1.0f / mCtrlFreq_Hz)
     {
     }
 

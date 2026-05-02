@@ -51,7 +51,7 @@ class CsvLogger
         record("foc.Mode", static_cast<float>(control.getMode()));
         record("foc.Enabled", static_cast<float>(control.getIsEnabled()));
         record("foc.Fault", static_cast<float>(control.getFaultStatus()));
-        record("foc.OmegaRef_rpm", control.getOmegaRef_rpm());
+        record("foc.OmegaRef_rad_Hz", control.getOmegaRef_rad_Hz());
         record("foc.OmegaElec_rad_Hz", control.getEncoderOmega_rad_Hz());
         record("foc.IdRef_A", control.getIdRef());
         record("foc.IqRef_A", control.getIqRef());
@@ -62,8 +62,11 @@ class CsvLogger
         record("foc.Ud_V", control.getUd_V());
         record("foc.Uq_V", control.getUq_V());
         record("foc.OpenLoopTheta_rad", control.getOpenLoopTheta_rad());
+        record("foc.OpenLoopOmega_rad_Hz", control.getOpenLoopOmega_rad_Hz());
         record("foc.EncoderTheta_rad", control.getEncoderTheta_rad());
+        record("foc.EncoderOmega_rad_Hz", control.getEncoderOmega_rad_Hz());
         record("foc.EmkObserverTheta_rad", control.getEmkObserverTheta_rad());
+        record("foc.EmkObserverOmega_rad_Hz", control.getEmkObserverOmega_rad_Hz());
         record("foc.ObserverError_deg",
                math::compute_angle_error(control.getEmkObserverTheta_rad(),
                                          control.getEncoderTheta_rad()) *
@@ -75,6 +78,7 @@ class CsvLogger
         record("sim.ThetaMech_rad", simState.mThetaMech_rad);
         record("sim.ThetaElec_rad", motor.getThetaElec_rad());
         record("sim.OmegaMech_rad_s", simState.mOmegaMech_rad_s);
+        record("sim.OmegaElec_rad_s", simState.mOmegaMech_rad_s * motor.getMotorPolePairs());
         record("sim.Speed_rpm", simSpeed_rpm);
 
         // Inverter Voltages
