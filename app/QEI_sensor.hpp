@@ -12,9 +12,12 @@ namespace app
 class EncoderSensor : public ISensor
 {
   public:
-    EncoderSensor(
-        IEncoder& encoder, float dt_s, float polePairs, float maxEncoderTicks, uint16_t offsetTicks)
-        : mEncoder(encoder), mDt_s(dt_s), mPolePairs_count(polePairs),
+    EncoderSensor(IEncoder& encoder,
+                  float pwmPeriod_s,
+                  float polePairs,
+                  float maxEncoderTicks,
+                  uint16_t offsetTicks)
+        : mEncoder(encoder), mPwmPeriod_s(pwmPeriod_s), mPolePairs_count(polePairs),
           mMaxTicks_count(maxEncoderTicks), mOffset_ticks(offsetTicks)
     {
     }
@@ -22,7 +25,7 @@ class EncoderSensor : public ISensor
     void update() override
     {
         readAndProcessAngle();
-        calculateVelocity();
+        updatePLL();
     }
 
     float getTheta_rad() const override
@@ -32,19 +35,21 @@ class EncoderSensor : public ISensor
 
     float getOmega_rad_Hz() const override
     {
-        return mOmega_rad_Hz;
+        return mEstimatedOmega_rad_Hz;
     }
 
     void reset() override
     {
         mTheta_rad = 0.0f;
-        mThetaOld_rad = 0.0f;
-        mOmega_rad_Hz = 0.0f;
+        mEstimatedTheta_rad = 0.0f;
+        mEstimatedOmega_rad_Hz = 0.0f;
+        mPllIntegrator = 0.0f;
     }
 
-    void setFilterAlpha(float alpha)
+    void setPllGains(float kp, float ki)
     {
-        mFilterAlpha_coeff = alpha;
+        mPllKp = kp;
+        mPllKi = ki;
     }
 
   private:
@@ -73,37 +78,42 @@ class EncoderSensor : public ISensor
         }
     }
 
-    void calculateVelocity()
+    void updatePLL()
     {
-        float deltaTheta_rad = mTheta_rad - mThetaOld_rad;
+        float thetaError = mTheta_rad - mEstimatedTheta_rad;
 
-        if (deltaTheta_rad > math::PI)
-        {
-            deltaTheta_rad -= math::TWO_PI;
-        }
-        else if (deltaTheta_rad < -math::PI)
-        {
-            deltaTheta_rad += math::TWO_PI;
-        }
+        if (thetaError > math::PI)
+            thetaError -= math::TWO_PI;
+        else if (thetaError < -math::PI)
+            thetaError += math::TWO_PI;
 
-        float rawOmega_rad_Hz = deltaTheta_rad / mDt_s;
+        mPllIntegrator += mPllKi * thetaError * mPwmPeriod_s;
 
-        mOmega_rad_Hz =
-            (mFilterAlpha_coeff * rawOmega_rad_Hz) + ((1.0f - mFilterAlpha_coeff) * mOmega_rad_Hz);
+        mEstimatedOmega_rad_Hz = (mPllKp * thetaError) + mPllIntegrator;
 
-        mThetaOld_rad = mTheta_rad;
+        mEstimatedTheta_rad += mEstimatedOmega_rad_Hz * mPwmPeriod_s;
+
+        if (mEstimatedTheta_rad > math::PI)
+            mEstimatedTheta_rad -= math::TWO_PI;
+        else if (mEstimatedTheta_rad < -math::PI)
+            mEstimatedTheta_rad += math::TWO_PI;
     }
 
     IEncoder& mEncoder;
-    float mDt_s;
-    float mPolePairs_count;
-    float mMaxTicks_count;
-    uint16_t mOffset_ticks;
+    const float mPwmPeriod_s;
+    const float mPolePairs_count;
+    const float mMaxTicks_count;
+    const uint16_t mOffset_ticks;
 
     float mTheta_rad{0.0f};
-    float mThetaOld_rad{0.0f};
-    float mOmega_rad_Hz{0.0f};
-    float mFilterAlpha_coeff{0.05f};
+
+    // PLL State Variables
+    float mEstimatedTheta_rad{0.0f};
+    float mEstimatedOmega_rad_Hz{0.0f};
+    float mPllIntegrator{0.0f};
+
+    float mPllKp{355.0f};
+    float mPllKi{63000.0f};
 };
 
 } // namespace app

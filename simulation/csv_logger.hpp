@@ -52,6 +52,7 @@ class CsvLogger
         record("foc.Enabled", static_cast<float>(control.getIsEnabled()));
         record("foc.Fault", static_cast<float>(control.getFaultStatus()));
         record("foc.OmegaRef_rpm", control.getOmegaRef_rpm());
+        record("foc.OmegaElec_rad_Hz", control.getEncoderOmega_rad_Hz());
         record("foc.IdRef_A", control.getIdRef());
         record("foc.IqRef_A", control.getIqRef());
         record("foc.Id_A", control.getId_A());
