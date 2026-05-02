@@ -1,5 +1,4 @@
 #pragma once
-#include "foc.hpp"
 #include "math.hpp"
 #include "motor_params.hpp"
 #include "powerstage_config.hpp"
@@ -27,75 +26,84 @@ class AutoSetup
         FINISHED
     };
 
-    explicit AutoSetup(MotorParams& params, FOC& foc, float dt_s)
-        : mParams(params), mFoc(foc), mRamp(dt_s), mDt_s(dt_s)
+    explicit AutoSetup(MotorParams& params, float pwmPeriod_s)
+        : mParams(params), mRamp(pwmPeriod_s), mPwmPeriod_s(pwmPeriod_s)
     {
     }
 
-    std::tuple<float, float>
-    run(float Id_A, float Iq_A, float UdApplied_V, float UqApplied_V, float UsLimit_V)
+    std::tuple<float, float, float, float, bool, bool>
+    step(float Id_A, float Iq_A, float UdApplied_V, float UqApplied_V)
     {
-        float IdRef_A = 0.0f;
+        float idRefOut_A = 0.0f;
+        float iqRefOut_A = 0.0f;
+        float udInjectOut_V = 0.0f;
+        float uqInjectOut_V = 0.0f;
+        bool bypassControl = false;
+        bool triggerTune = false;
+
         switch (mState)
         {
             case State::IDLE:
-                mFoc.setCurrentControlGainsManual(0.5f, 0.01f);
-                return {0.0f, 0.0f};
+                break;
 
             case State::RS_RAMP_UP:
             {
-                if (rampCurrent(mTargetCurrent_A, 2.0f, IdRef_A))
+                if (rampCurrent(mTargetCurrent_A, 2.0f, idRefOut_A))
                 {
                     mState = State::RS_MEASURE;
                 }
-                return mFoc.runCurrentControl(IdRef_A, 0.0f, Id_A, Iq_A, 0.0f, UsLimit_V, true);
+                break;
             }
 
             case State::RS_MEASURE:
+                idRefOut_A = mTargetCurrent_A;
                 if (measureRs(Id_A, Iq_A, UdApplied_V, 0.0f))
                 {
-
                     mState = State::RS_RAMP_DOWN;
                 }
-                return mFoc.runCurrentControl(
-                    mTargetCurrent_A, 0.0f, Id_A, Iq_A, 0.0f, UsLimit_V, true);
+                break;
 
             case State::RS_RAMP_DOWN:
-                if (rampCurrent(0.0f, 5.0f, IdRef_A))
+                if (rampCurrent(0.0f, 5.0f, idRefOut_A))
                 {
                     mState = State::LS_MEASURE;
                 }
-                return mFoc.runCurrentControl(IdRef_A, 0.0f, Id_A, Iq_A, 0.0f, UsLimit_V, true);
+                break;
 
             case State::LS_MEASURE:
+                bypassControl = true;
                 if (measureLs(Id_A))
                 {
                     mState = State::LS_RAMP_DOWN;
                 }
-                return {mLastUdCommand_V, 0.0f};
+                udInjectOut_V = mLastUdCommand_V;
+                break;
 
             case State::LS_RAMP_DOWN:
+                bypassControl = true;
                 if (rampVoltageDown())
                 {
                     mState = State::PI_TUNE;
                 }
-                return {mLastUdCommand_V, 0.0f};
+                udInjectOut_V = mLastUdCommand_V;
+                break;
 
             case State::PI_TUNE:
-                mFoc.setCurrentControlGains();
+                triggerTune = true;
                 mState = State::FINISHED;
-                return {0.0f, 0.0f};
+                break;
 
             case State::FINISHED:
             default:
-                return {0.0f, 0.0f};
+                break;
         }
+
+        return {idRefOut_A, iqRefOut_A, udInjectOut_V, uqInjectOut_V, bypassControl, triggerTune};
     }
 
     void startAutoSetup(float IsAbs_A)
     {
         mTargetCurrent_A = IsAbs_A;
-        mCurrentStep = 0;
         mInjectionVoltage_V = 0.0f;
         mTime_s = 0.0f;
         mState = State::RS_RAMP_UP;
@@ -129,7 +137,7 @@ class AutoSetup
 
         if (std::abs(Iq_A) > (mTargetCurrent_A * 0.05f))
         {
-            resetPhase(); // Restart measurement if rotor moved
+            resetPhase();
             return false;
         }
 
@@ -165,7 +173,7 @@ class AutoSetup
             mInjectionVoltage_V = mParams.RTotal_ohm * mTargetCurrent_A;
         }
 
-        mTime_s += mDt_s;
+        mTime_s += mPwmPeriod_s;
         mLastUdCommand_V = mInjectionVoltage_V * math::sin(omega_rad_Hz * mTime_s);
         mMeasuredCurrentPeak_A = std::max(mMeasuredCurrentPeak_A, std::abs(Id_A));
 
@@ -217,7 +225,7 @@ class AutoSetup
             mTimer = 0;
             mInjectionVoltage_V = std::max(0.0f, mInjectionVoltage_V - 0.1f);
         }
-        mTime_s += mDt_s;
+        mTime_s += mPwmPeriod_s;
         mLastUdCommand_V = mInjectionVoltage_V * math::sin(omegaInjection_rad_Hz * mTime_s);
         return (mInjectionVoltage_V <= 0.0f);
     }
@@ -232,22 +240,17 @@ class AutoSetup
     }
 
     MotorParams& mParams;
-    FOC& mFoc;
     RampGenerator mRamp;
     State mState = State::IDLE;
 
-    uint8_t mCurrentStep{0};
-    float mMeasuredI{};
-    float mMeasuredU{};
-
-    float mDt_s, mTargetCurrent_A{0}, mUdSum{0}, mIdSum{0}, mTime_s{0}, mMeasuredCurrentPeak_A{0};
+    float mPwmPeriod_s;
+    float mTargetCurrent_A{0};
+    float mUdSum{0};
+    float mIdSum{0};
+    float mTime_s{0};
+    float mMeasuredCurrentPeak_A{0};
     float mInjectionVoltage_V{0.0f};
     uint32_t mTimer{0}, mSamples{0};
     float mLastUdCommand_V{0.0f};
-    float mLastUqCommand_V{0.0f};
-    uint8_t mPiTuneState{0};
-    uint32_t mPiTuneTimer{0};
-    float mIdResponseMax{0.0f};
-    float mIqResponseMax{0.0f};
 };
 } // namespace app
