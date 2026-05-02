@@ -39,6 +39,7 @@ class SimRunner
                           simParams.Lq_H,
                           simParams.fluxPm_Wb,
                           simParams.polePairs_count,
+                          2000,
                           0},
 
           // Initialize Physics
