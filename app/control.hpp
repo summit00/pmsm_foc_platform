@@ -39,7 +39,7 @@ class Control
                      UserInterface& ui,
                      float pwmPeriod_s)
         : mAdcSense(adc_sense), mInverter(inverter), mGateEnable(gate_enable),
-          mMotorParams(motor_params), mFoc(motor_params), mUi(ui),
+          mMotorParams(motor_params), mFoc(motor_params, pwmPeriod_s), mUi(ui),
           mOpenLoopSensor(pwmPeriod_s, mOmegaRef_rad_Hz, mMotorEnabled_bool),
           mEncoderSensor(encoder,
                          pwmPeriod_s,
