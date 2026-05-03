@@ -193,11 +193,8 @@ class Control
                 if (++mSpeedLoopCounter_count >= mSpeedLoopDivider_count)
                 {
                     mSpeedLoopCounter_count = 0;
-                    std::tie(mIdRef_A, mIqRef_A) = mFoc.runSpeedControl(mOmegaRef_rad_Hz,
-                                                                        activeOmega_rad_Hz,
-                                                                        -mIsAbs_A,
-                                                                        mIsAbs_A,
-                                                                        mMotorEnabled_bool);
+                    std::tie(mIdRef_A, mIqRef_A) = mFoc.runSpeedControl(
+                        mOmegaRef_rad_Hz, activeOmega_rad_Hz, mIsAbs_A, mMotorEnabled_bool);
                 }
                 break;
 
