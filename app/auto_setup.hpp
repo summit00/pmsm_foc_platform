@@ -23,16 +23,22 @@ class AutoSetup
         LS_MEASURE,
         LS_RAMP_DOWN,
         PI_TUNE,
+        ALIGN_FWD,
+        ALIGN_BWD,
         FINISHED
     };
 
     explicit AutoSetup(MotorParams& params, float pwmPeriod_s)
-        : mParams(params), mRamp(pwmPeriod_s), mPwmPeriod_s(pwmPeriod_s)
+        : mParams(params), mRamp(pwmPeriod_s), mRampSpeed(pwmPeriod_s), mPwmPeriod_s(pwmPeriod_s)
     {
     }
 
-    std::tuple<float, float, float, float, bool, bool>
-    step(float Id_A, float Iq_A, float UdApplied_V, float UqApplied_V)
+    std::tuple<float, float, float, float, bool, bool, float> step(float Id_A,
+                                                                   float Iq_A,
+                                                                   float UdApplied_V,
+                                                                   float UqApplied_V,
+                                                                   float thetaOpenLoop,
+                                                                   float thetaEncoder)
     {
         float idRefOut_A = 0.0f;
         float iqRefOut_A = 0.0f;
@@ -40,6 +46,7 @@ class AutoSetup
         float uqInjectOut_V = 0.0f;
         bool bypassControl = false;
         bool triggerTune = false;
+        float omegaRef_rad_Hz = 0.0f;
 
         switch (mState)
         {
@@ -90,7 +97,42 @@ class AutoSetup
 
             case State::PI_TUNE:
                 triggerTune = true;
-                mState = State::FINISHED;
+                bypassControl = false;
+                resetPhase();
+                mState = State::ALIGN_FWD;
+                break;
+
+            case State::ALIGN_FWD:
+                triggerTune = false;
+                bypassControl = false;
+                udInjectOut_V = 0.0f;
+                udInjectOut_V = 0.0f;
+                idRefOut_A = mTargetCurrent_A;
+                omegaRef_rad_Hz = mRampSpeed.update(mAlignSpeed_rad_Hz, 150.0f);
+                mOmegaDebug_rad_Hz = omegaRef_rad_Hz;
+                if (std::abs(omegaRef_rad_Hz - mAlignSpeed_rad_Hz) < 0.1f)
+                {
+                    if (averageOffset(thetaOpenLoop, thetaEncoder, mOffsetFwd))
+                    {
+                        mState = State::ALIGN_BWD;
+                        resetPhase();
+                    }
+                }
+                break;
+
+            case State::ALIGN_BWD:
+                idRefOut_A = mTargetCurrent_A;
+                omegaRef_rad_Hz = mRampSpeed.update(-mAlignSpeed_rad_Hz, 150.0f);
+                mOmegaDebug_rad_Hz = omegaRef_rad_Hz;
+                if (std::abs(omegaRef_rad_Hz + mAlignSpeed_rad_Hz) < 0.1f)
+                {
+                    if (averageOffset(thetaOpenLoop, thetaEncoder, mOffsetBwd))
+                    {
+                        calculateFinalOffset();
+                        mState = State::FINISHED;
+                        resetPhase();
+                    }
+                }
                 break;
 
             case State::FINISHED:
@@ -98,7 +140,13 @@ class AutoSetup
                 break;
         }
 
-        return {idRefOut_A, iqRefOut_A, udInjectOut_V, uqInjectOut_V, bypassControl, triggerTune};
+        return {idRefOut_A,
+                iqRefOut_A,
+                udInjectOut_V,
+                uqInjectOut_V,
+                bypassControl,
+                triggerTune,
+                omegaRef_rad_Hz};
     }
 
     void startAutoSetup(float IsAbs_A)
@@ -121,6 +169,11 @@ class AutoSetup
     void reset()
     {
         mState = State::IDLE;
+    }
+
+    float debug() const
+    {
+        return mOmegaDebug_rad_Hz;
     }
 
   private:
@@ -230,6 +283,36 @@ class AutoSetup
         return (mInjectionVoltage_V <= 0.0f);
     }
 
+    bool averageOffset(float ref, float fb, float& result)
+    {
+        if (++mTimer < 5000)
+            return false;
+        float diff = ref - fb;
+        // Wrap difference to [-PI, PI]
+        while (diff > math::PI)
+            diff -= 2.0f * math::PI;
+        while (diff < -math::PI)
+            diff += 2.0f * math::PI;
+
+        mOffsetSum += diff;
+        if (++mSamples >= 10000)
+        {
+            result = mOffsetSum / mSamples;
+            return true;
+        }
+        return false;
+    }
+
+    void calculateFinalOffset()
+    {
+        float finalRad = (mOffsetFwd + mOffsetBwd) * 0.5f;
+        // Convert radians to encoder ticks
+        float ticksPerRev = static_cast<float>(mParams.encoderTicks);
+        float polePairs = static_cast<float>(mParams.polePairs);
+        mParams.encoderOffset_ticks =
+            static_cast<int32_t>((finalRad * ticksPerRev) / (2.0f * math::PI * polePairs));
+    }
+
     void resetPhase()
     {
         mTimer = 0;
@@ -241,6 +324,7 @@ class AutoSetup
 
     MotorParams& mParams;
     RampGenerator mRamp;
+    RampGenerator mRampSpeed;
     State mState = State::IDLE;
 
     float mPwmPeriod_s;
@@ -252,5 +336,14 @@ class AutoSetup
     float mInjectionVoltage_V{0.0f};
     uint32_t mTimer{0}, mSamples{0};
     float mLastUdCommand_V{0.0f};
+    //
+    float mOffsetFwd{0.0f};
+    float mOffsetBwd{0.0f};
+    float mOffsetSum{0.0f};
+    float mAlignSpeed_rad_Hz{40.0f};
+    float thetaOpenLoop{0.0f};
+    float thetaEncoder{0.0f};
+
+    float mOmegaDebug_rad_Hz{0.0f};
 };
 } // namespace app

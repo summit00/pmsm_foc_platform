@@ -160,6 +160,21 @@ class Control
         return mMotorParams.Lq_H;
     }
 
+    uint16_t getEncoderOffset_ticks() const
+    {
+        return mMotorParams.encoderOffset_ticks;
+    }
+
+    uint8_t getAutoSetupState() const
+    {
+        return static_cast<uint8_t>(mAutoSetup.getState());
+    }
+
+    float getAutoSetupDebug() const
+    {
+        return mAutoSetup.debug();
+    }
+
     void run_isr()
     {
         readUserCommands();
@@ -201,8 +216,6 @@ class Control
             case Mode::AUTOSETUP:
                 if (mMotorEnabled_bool)
                 {
-                    mSensorSelector.selectSensor(SensorSelector::SensorType::OpenLoop);
-
                     if (mAutoSetup.getState() == AutoSetup::State::IDLE)
                     {
                         mAutoSetup.startAutoSetup(mIsAbs_A);
@@ -210,12 +223,16 @@ class Control
                     }
 
                     bool triggerPiTune = false;
+                    float thetaOpenLoop = mOpenLoopSensor.getTheta_rad();
+                    float thetaEncoder = mEncoderSensor.getTheta_rad();
                     std::tie(mIdRef_A,
                              mIqRef_A,
                              injectedUd_V,
                              injectedUq_V,
                              bypassCurrentControl,
-                             triggerPiTune) = mAutoSetup.step(mId_A, mIq_A, mUd_V, mUq_V);
+                             triggerPiTune,
+                             mOmegaRef_rad_Hz) =
+                        mAutoSetup.step(mId_A, mIq_A, mUd_V, mUq_V, thetaOpenLoop, thetaEncoder);
 
                     if (triggerPiTune)
                     {
@@ -225,7 +242,9 @@ class Control
                 break;
         }
 
-        if (!bypassCurrentControl)
+        mbyPass = bypassCurrentControl;
+
+        if (!bypassCurrentControl and !mbyPass)
         {
             std::tie(mUd_V, mUq_V) = mFoc.runCurrentControl(mIdRef_A,
                                                             mIqRef_A,
@@ -280,14 +299,17 @@ class Control
 
     void calculateSpeed()
     {
-        if (mMotorEnabled_bool && mMode != Mode::AUTOSETUP)
+        if (mMotorEnabled_bool)
         {
-            mOmegaRef_rad_Hz = mSpeedRamp.update(mTargetOmega_rad_Hz, mAcceleration_rad_Hz2);
+            if (mMode != Mode::AUTOSETUP)
+            {
+                mOmegaRef_rad_Hz = mSpeedRamp.update(mTargetOmega_rad_Hz, mAcceleration_rad_Hz2);
+            }
         }
         else
         {
-            mSpeedRamp.reset(0.0f);
-            mOmegaRef_rad_Hz = 0.0f;
+            // mSpeedRamp.reset(0.0f);
+            //  mOmegaRef_rad_Hz = 0.0f;
         }
     }
 
@@ -318,7 +340,7 @@ class Control
         if (newMode != mMode)
         {
             mMode = newMode;
-            if (mMode == Mode::OPENLOOP)
+            if (mMode == Mode::OPENLOOP or mMode == Mode::AUTOSETUP)
             {
                 mSensorSelector.selectSensor(SensorSelector::SensorType::OpenLoop);
             }
@@ -404,6 +426,8 @@ class Control
     float mTemp_C{0.0f};
     float mUsLimit_V{};
     uint8_t mIsErrorrState{};
+
+    volatile bool mbyPass{false};
 
     // State Variables
     Mode mMode{Mode::OPENLOOP};

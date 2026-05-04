@@ -27,7 +27,7 @@ class SimRunner
     SimRunner(const SimMotorParams& simParams,
               const ILoadModel& externalLoad,
               const std::string& logFilename = "sim_output.csv",
-              uint32_t physicsOversample_count = 10,
+              uint32_t physicsOversample_count = 4,
               float ctrlFreq_Hz = 20000.0f)
         : mCtrlFreq_Hz(20000.0f), mPhysicsDt_s(1.0f / (ctrlFreq_Hz * physicsOversample_count)),
           mStepsPerIsr_count(physicsOversample_count),

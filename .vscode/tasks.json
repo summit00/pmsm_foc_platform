@@ -11,14 +11,18 @@
       "label": "2. Build Project",
       "type": "shell",
       "command": "$target = Get-Content .target_config -ErrorAction SilentlyContinue; if (!$target) { Write-Error 'Please run Configure first!'; exit 1 }; if ($target -eq 'stm32g431') { cmake --build build } elseif ($target -eq 'SIL-Simulation') { cmake --build build-host --target system_test } else { cmake --build build-host --target unit_tests }",
-      "group": "build",
-      "problemMatcher": [
-        "$gcc"
-      ]
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$gcc"]
     },
     {
       "label": "3. Flash / Run",
       "type": "shell",
+      "dependsOn": [
+        "2. Build Project"
+      ],
       "command": "$target = Get-Content .target_config -ErrorAction SilentlyContinue; if (!$target) { Write-Error 'Please run Configure first!'; exit 1 }; if ($target -eq 'stm32g431') { & 'C:\\Program Files\\STMicroelectronics\\STM32Cube\\STM32CubeProgrammer\\bin\\STM32_Programmer_CLI.exe' -c port=SWD -w '${workspaceFolder}\\build\\platform\\pmsm_foc_platform.elf' -v -rst } elseif ($target -eq 'SIL-Simulation') { & '${workspaceFolder}\\build-host\\tests\\sim\\system_test.exe' -s } else { & '${workspaceFolder}\\build-host\\tests\\unit_tests\\unit_tests.exe' }",
       "group": "test",
       "presentation": {
