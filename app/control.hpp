@@ -191,6 +191,10 @@ class Control
         float activeTheta_rad = mSensorSelector.getActiveTheta_rad();
         float activeOmega_rad_Hz = mSensorSelector.getActiveOmega_rad_Hz();
 
+        angleError = math::compute_angle_error(mOpenLoopSensor.getTheta_rad(),
+                                               mEncoderSensor.getTheta_rad()) *
+                     360.0f / math::TWO_PI;
+
         std::tie(mId_A, mIq_A) = mTransforms.park(mIalpha_A, mIbeta_A, activeTheta_rad);
 
         bool bypassCurrentControl = false;
@@ -242,9 +246,7 @@ class Control
                 break;
         }
 
-        mbyPass = bypassCurrentControl;
-
-        if (!bypassCurrentControl and !mbyPass)
+        if (!bypassCurrentControl)
         {
             std::tie(mUd_V, mUq_V) = mFoc.runCurrentControl(mIdRef_A,
                                                             mIqRef_A,
@@ -308,8 +310,8 @@ class Control
         }
         else
         {
-            // mSpeedRamp.reset(0.0f);
-            //  mOmegaRef_rad_Hz = 0.0f;
+            mSpeedRamp.reset(0.0f);
+            mOmegaRef_rad_Hz = 0.0f;
         }
     }
 
@@ -426,9 +428,6 @@ class Control
     float mTemp_C{0.0f};
     float mUsLimit_V{};
     uint8_t mIsErrorrState{};
-
-    volatile bool mbyPass{false};
-
     // State Variables
     Mode mMode{Mode::OPENLOOP};
     bool mMotorEnabled_bool{false};
@@ -438,6 +437,8 @@ class Control
     uint8_t mTelemetryCounter_count{0};
     uint32_t mSpeedLoopCounter_count{0};
     const uint32_t mSpeedLoopDivider_count{10};
+
+    float angleError{};
 };
 
 } // namespace app

@@ -285,7 +285,7 @@ class AutoSetup
 
     bool averageOffset(float ref, float fb, float& result)
     {
-        if (++mTimer < 5000)
+        if (++mTimer < 10000)
             return false;
         float diff = ref - fb;
         // Wrap difference to [-PI, PI]
@@ -295,7 +295,7 @@ class AutoSetup
             diff += 2.0f * math::PI;
 
         mOffsetSum += diff;
-        if (++mSamples >= 10000)
+        if (++mSamples >= 20000)
         {
             result = mOffsetSum / mSamples;
             return true;
@@ -306,11 +306,21 @@ class AutoSetup
     void calculateFinalOffset()
     {
         float finalRad = (mOffsetFwd + mOffsetBwd) * 0.5f;
-        // Convert radians to encoder ticks
         float ticksPerRev = static_cast<float>(mParams.encoderTicks);
         float polePairs = static_cast<float>(mParams.polePairs);
-        mParams.encoderOffset_ticks =
-            static_cast<int32_t>((finalRad * ticksPerRev) / (2.0f * math::PI * polePairs));
+
+        int32_t ticksPerElecRev = static_cast<int32_t>(ticksPerRev / polePairs);
+
+        int32_t offset =
+            static_cast<int32_t>((finalRad * ticksPerRev) / (math::TWO_PI * polePairs));
+
+        offset %= ticksPerElecRev;
+        if (offset < 0)
+        {
+            offset += ticksPerElecRev;
+        }
+
+        mParams.encoderOffset_ticks = offset;
     }
 
     void resetPhase()
@@ -320,6 +330,7 @@ class AutoSetup
         mUdSum = 0;
         mIdSum = 0;
         mMeasuredCurrentPeak_A = 0;
+        mOffsetSum = 0;
     }
 
     MotorParams& mParams;
@@ -340,7 +351,7 @@ class AutoSetup
     float mOffsetFwd{0.0f};
     float mOffsetBwd{0.0f};
     float mOffsetSum{0.0f};
-    float mAlignSpeed_rad_Hz{40.0f};
+    float mAlignSpeed_rad_Hz{300.0f};
     float thetaOpenLoop{0.0f};
     float thetaEncoder{0.0f};
 

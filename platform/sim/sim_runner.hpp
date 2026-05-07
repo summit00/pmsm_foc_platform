@@ -92,6 +92,11 @@ class SimRunner
         }
     }
 
+    void setEncoderOffset(float offset_rad)
+    {
+        mSimEncoder.set_alignment_offset(offset_rad);
+    }
+
     app::Control& getControl()
     {
         return mControl;

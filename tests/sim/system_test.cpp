@@ -2,6 +2,7 @@
 #include "sim_runner.hpp"
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 TEST_CASE("Id step response")
@@ -133,12 +134,14 @@ TEST_CASE("Auto-Setup Test")
     float oldResistance_ohm = control.getRs_ohm();
     float oldLd_H = control.getLd_H();
     float oldLq_H = control.getLq_H();
+    runner.setEncoderOffset(1);
+
     ui.mEnable = 1;
     ui.targetSpeed_rpm = 0.0f;
     ui.mAcceleration_rpm_s = 0.0f;
     ui.mIsAbs_mA = 1500;
 
-    runner.run(4.0f, 0.0f);
+    runner.run(6.0f, 0.0f);
 
     CHECK(oldResistance_ohm != control.getRs_ohm());
     CHECK(oldLd_H != control.getLd_H());
