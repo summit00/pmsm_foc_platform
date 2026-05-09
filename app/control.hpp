@@ -175,11 +175,6 @@ class Control
         return static_cast<uint8_t>(mAutoSetup.getState());
     }
 
-    float getAutoSetupDebug() const
-    {
-        return mAutoSetup.debug();
-    }
-
     void run_isr()
     {
         readUserCommands();
@@ -231,19 +226,21 @@ class Control
                         mFoc.setCurrentControlGainsManual(0.5f, 0.01f);
                     }
 
-                    bool triggerPiTune = false;
-                    float thetaOpenLoop = mOpenLoopSensor.getTheta_rad();
-                    float thetaEncoder = mEncoderSensor.getTheta_rad();
-                    std::tie(mIdRef_A,
-                             mIqRef_A,
-                             injectedUd_V,
-                             injectedUq_V,
-                             bypassCurrentControl,
-                             triggerPiTune,
-                             mOmegaRef_rad_Hz) =
-                        mAutoSetup.step(mId_A, mIq_A, mUd_V, mUq_V, thetaOpenLoop, thetaEncoder);
+                    float thetaOpenLoop_rad = mOpenLoopSensor.getTheta_rad();
+                    float thetaEncoder_rad = mEncoderSensor.getTheta_rad();
+                    mAutoSetupRefs = mAutoSetup.step(
+                        mId_A, mIq_A, mUd_V, mUq_V, thetaOpenLoop_rad, thetaEncoder_rad);
 
-                    if (triggerPiTune)
+                    mIdRef_A = mAutoSetupRefs.IdRef_A;
+                    mIqRef_A = mAutoSetupRefs.IqRef_A;
+                    injectedUd_V = mAutoSetupRefs.UdInject_V;
+                    injectedUq_V = mAutoSetupRefs.UqInject_V;
+                    bypassCurrentControl = mAutoSetupRefs.BypassCurrentControl;
+                    mOmegaRef_rad_Hz = mAutoSetupRefs.OmegaRef_rad_Hz;
+                    mSensorSelector.selectSensor(
+                        static_cast<SensorSelector::SensorType>(mAutoSetupRefs.sensorMode));
+
+                    if (mAutoSetupRefs.TriggerTuning)
                     {
                         mFoc.setCurrentControlGains();
                     }
@@ -251,7 +248,7 @@ class Control
                 break;
         }
 
-        if (!bypassCurrentControl)
+        if (!mAutoSetupRefs.BypassCurrentControl)
         {
             std::tie(mUd_V, mUq_V) = mFoc.runCurrentControl(mIdRef_A,
                                                             mIqRef_A,
@@ -437,6 +434,7 @@ class Control
     Mode mMode{Mode::OPENLOOP};
     bool mMotorEnabled_bool{false};
     bool mCmdMotorEnabled_bool{false};
+    AutoSetupReferences mAutoSetupRefs;
 
     // Counters
     uint8_t mTelemetryCounter_count{0};

@@ -72,7 +72,6 @@ class CsvLogger
                                          control.getEncoderTheta_rad()) *
                    (180.0f / std::numbers::pi_v<float>));
         record("foc.AutoSetupState", static_cast<float>(control.getAutoSetupState()));
-        record("foc.AutoSetupSpeed", static_cast<float>(control.getAutoSetupDebug()));
         record("foc.EncoderOffsetTicks", static_cast<float>(control.getEncoderOffset_ticks()));
 
         // Simulation Physics (The Ground Truth)

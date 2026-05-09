@@ -11,6 +11,18 @@
 namespace app
 {
 
+struct AutoSetupReferences
+{
+    float IdRef_A{0.0f};
+    float IqRef_A{0.0f};
+    float UdInject_V{0.0f};
+    float UqInject_V{0.0f};
+    bool BypassCurrentControl{false};
+    bool TriggerTuning{false};
+    float OmegaRef_rad_Hz{0.0f};
+    uint8_t sensorMode{0};
+};
+
 class AutoSetup
 {
   public:
@@ -27,8 +39,26 @@ class AutoSetup
         ALIGN_BWD,
         SPEED_RAMP_DOWN,
         PSI_MEASUREMENT,
-        SPEED_RAMP_DOWN2,
+        SPEED_RAMP_STOP,
         FINISHED
+    };
+
+    struct Config
+    {
+        static constexpr uint32_t RS_SETTLE_TICKS = 15000;
+        static constexpr uint32_t RS_MEASURE_SAMPLES = 10000;
+        static constexpr uint32_t LS_MEASURE_SAMPLES = 10000;
+        static constexpr uint32_t PSI_MEASURE_SAMPLES = 20000;
+        static constexpr uint32_t ALIGN_SETTLE_SAMPLES = 20000;
+
+        static constexpr float RS_RAMP_RATE_A_S = 2.0f;
+        static constexpr float RS_DISCHARGE_RATE_A_S = 5.0f;
+        static constexpr float ALIGN_ACCEL_RAD_S2 = 150.0f;
+        static constexpr float STOP_ACCEL_RAD_S2 = 1000.0f;
+
+        static constexpr float LS_INJECTION_FREQ_HZ = 1000.0f;
+        static constexpr float ALIGN_SPEED_RAD_S = 300.0f;
+        static constexpr float SETTLE_THRESHOLD_RAD_S = 0.1f;
     };
 
     explicit AutoSetup(MotorParams& params, float pwmPeriod_s)
@@ -36,20 +66,14 @@ class AutoSetup
     {
     }
 
-    std::tuple<float, float, float, float, bool, bool, float> step(float Id_A,
-                                                                   float Iq_A,
-                                                                   float UdApplied_V,
-                                                                   float UqApplied_V,
-                                                                   float thetaOpenLoop,
-                                                                   float thetaEncoder)
+    AutoSetupReferences step(float Id_A,
+                             float Iq_A,
+                             float UdApplied_V,
+                             float UqApplied_V,
+                             float thetaOpenLoop_rad,
+                             float thetaEncoder_rad)
     {
-        float idRefOut_A = 0.0f;
-        float iqRefOut_A = 0.0f;
-        float udInjectOut_V = 0.0f;
-        float uqInjectOut_V = 0.0f;
-        bool bypassControl = false;
-        bool triggerTune = false;
-        float omegaRef_rad_Hz = 0.0f;
+        AutoSetupReferences ref;
 
         switch (mState)
         {
@@ -57,138 +81,114 @@ class AutoSetup
                 break;
 
             case State::RS_RAMP_UP:
-            {
-                if (rampCurrent(mTargetCurrent_A, 2.0f, idRefOut_A))
-                {
+                if (rampCurrent(mTargetCurrent_A, Config::RS_RAMP_RATE_A_S, ref.IdRef_A))
                     mState = State::RS_MEASURE;
-                }
                 break;
-            }
 
             case State::RS_MEASURE:
-                idRefOut_A = mTargetCurrent_A;
-                if (measureRs(Id_A, Iq_A, UdApplied_V, 0.0f))
-                {
+                ref.IdRef_A = mTargetCurrent_A;
+                if (measureRs(Id_A, Iq_A, UdApplied_V))
                     mState = State::RS_RAMP_DOWN;
-                }
                 break;
 
             case State::RS_RAMP_DOWN:
-                if (rampCurrent(0.0f, 5.0f, idRefOut_A))
-                {
+                if (rampCurrent(0.0f, Config::RS_DISCHARGE_RATE_A_S, ref.IdRef_A))
                     mState = State::LS_MEASURE;
-                }
                 break;
 
             case State::LS_MEASURE:
-                bypassControl = true;
-                if (measureLs(Id_A))
-                {
+                ref.BypassCurrentControl = true;
+                if (measureLs(Id_A, ref.UdInject_V))
                     mState = State::LS_RAMP_DOWN;
-                }
-                udInjectOut_V = mLastUdCommand_V;
                 break;
 
             case State::LS_RAMP_DOWN:
-                bypassControl = true;
-                if (rampVoltageDown())
-                {
+                ref.BypassCurrentControl = true;
+                if (rampVoltageDown(ref.UdInject_V))
                     mState = State::PI_TUNE;
-                }
-                udInjectOut_V = mLastUdCommand_V;
                 break;
 
             case State::PI_TUNE:
-                triggerTune = true;
-                bypassControl = false;
+                ref.TriggerTuning = true;
                 resetPhase();
                 mState = State::ALIGN_FWD;
                 break;
 
             case State::ALIGN_FWD:
-                triggerTune = false;
-                bypassControl = false;
-                udInjectOut_V = 0.0f;
-                udInjectOut_V = 0.0f;
-                idRefOut_A = mTargetCurrent_A;
-                omegaRef_rad_Hz = mRampSpeed.update(mAlignSpeed_rad_Hz, 150.0f);
-                mOmegaDebug_rad_Hz = omegaRef_rad_Hz;
-                if (std::abs(omegaRef_rad_Hz - mAlignSpeed_rad_Hz) < 0.1f)
+                ref.IdRef_A = mTargetCurrent_A;
+                ref.sensorMode = 0;
+                if (rampSpeed(
+                        Config::ALIGN_SPEED_RAD_S, Config::ALIGN_ACCEL_RAD_S2, ref.OmegaRef_rad_Hz))
                 {
-                    if (averageOffset(thetaOpenLoop, thetaEncoder, mOffsetFwd))
+                    if (averageOffset(thetaOpenLoop_rad, thetaEncoder_rad, mOffsetFwd_rad))
                     {
-                        mState = State::ALIGN_BWD;
                         resetPhase();
+                        mState = State::ALIGN_BWD;
                     }
                 }
                 break;
 
             case State::ALIGN_BWD:
-                idRefOut_A = mTargetCurrent_A;
-                omegaRef_rad_Hz = mRampSpeed.update(-mAlignSpeed_rad_Hz, 200.0f);
-                if (std::abs(omegaRef_rad_Hz + mAlignSpeed_rad_Hz) < 0.1f)
+                ref.IdRef_A = mTargetCurrent_A;
+                ref.sensorMode = 0;
+                ref.OmegaRef_rad_Hz =
+                    mRampSpeed.update(-Config::ALIGN_SPEED_RAD_S, Config::ALIGN_ACCEL_RAD_S2);
+                if (std::abs(ref.OmegaRef_rad_Hz + Config::ALIGN_SPEED_RAD_S) <
+                    Config::SETTLE_THRESHOLD_RAD_S)
                 {
-                    if (averageOffset(thetaOpenLoop, thetaEncoder, mOffsetBwd))
+                    if (averageOffset(thetaOpenLoop_rad, thetaEncoder_rad, mOffsetBwd_rad))
                     {
                         calculateFinalOffset();
-                        mState = State::SPEED_RAMP_DOWN;
                         resetPhase();
+                        mState = State::SPEED_RAMP_DOWN;
                     }
                 }
                 break;
 
             case State::SPEED_RAMP_DOWN:
-                idRefOut_A = mTargetCurrent_A;
-                omegaRef_rad_Hz = mRampSpeed.update(0.0f, 1000.0f);
-                if (std::abs(omegaRef_rad_Hz) < 0.1f)
+                ref.IdRef_A = mTargetCurrent_A;
+
+                if (rampSpeed(0.0f, Config::STOP_ACCEL_RAD_S2, ref.OmegaRef_rad_Hz))
                 {
-                    mState = State::PSI_MEASUREMENT;
                     resetPhase();
+                    mState = State::PSI_MEASUREMENT;
                 }
                 break;
 
             case State::PSI_MEASUREMENT:
-                idRefOut_A = mTargetCurrent_A;
-                omegaRef_rad_Hz = mRampSpeed.update(-mAlignSpeed_rad_Hz, 200.0f);
-                if (std::abs(omegaRef_rad_Hz + mAlignSpeed_rad_Hz) < 0.1f)
+                ref.IdRef_A = mTargetCurrent_A;
+                ref.OmegaRef_rad_Hz =
+                    mRampSpeed.update(-Config::ALIGN_SPEED_RAD_S, Config::ALIGN_ACCEL_RAD_S2);
+                if (std::abs(ref.OmegaRef_rad_Hz + Config::ALIGN_SPEED_RAD_S) <
+                    Config::SETTLE_THRESHOLD_RAD_S)
                 {
-                    if (measurePsi(Id_A, Iq_A, UqApplied_V, omegaRef_rad_Hz))
+                    if (measurePsi(Id_A, Iq_A, UqApplied_V, ref.OmegaRef_rad_Hz))
                     {
-                        mState = State::SPEED_RAMP_DOWN2;
                         resetPhase();
+                        mState = State::SPEED_RAMP_STOP;
                     }
                 }
                 break;
 
-            case State::SPEED_RAMP_DOWN2:
-                idRefOut_A = mTargetCurrent_A;
-                omegaRef_rad_Hz = mRampSpeed.update(0.0f, 1000.0f);
-                if (std::abs(omegaRef_rad_Hz) < 0.1f)
+            case State::SPEED_RAMP_STOP:
+                ref.IdRef_A = mTargetCurrent_A;
+
+                if (rampSpeed(0.0f, Config::STOP_ACCEL_RAD_S2, ref.OmegaRef_rad_Hz))
                 {
-                    mState = State::FINISHED;
                     resetPhase();
+                    mState = State::FINISHED;
                 }
                 break;
 
             case State::FINISHED:
-                idRefOut_A = 0.0f;
-                iqRefOut_A = 0.0f;
-                udInjectOut_V = 0.0f;
-                uqInjectOut_V = 0.0f;
-                bypassControl = false;
-                triggerTune = false;
-                omegaRef_rad_Hz = 0.0f;
+                resetPhase();
+                break;
+
             default:
                 break;
         }
 
-        return {idRefOut_A,
-                iqRefOut_A,
-                udInjectOut_V,
-                uqInjectOut_V,
-                bypassControl,
-                triggerTune,
-                omegaRef_rad_Hz};
+        return ref;
     }
 
     void startAutoSetup(float IsAbs_A)
@@ -213,11 +213,6 @@ class AutoSetup
         mState = State::IDLE;
     }
 
-    float debug() const
-    {
-        return mOmegaDebug_rad_Hz;
-    }
-
   private:
     bool rampCurrent(float target_A, float rampRate_A_Hz, float& id_ref_out_A)
     {
@@ -225,9 +220,15 @@ class AutoSetup
         return std::abs(id_ref_out_A - target_A) < 0.01f;
     }
 
-    bool measureRs(float Id_A, float Iq_A, float Ud_V, float Uq_V)
+    bool rampSpeed(float omegaRef_rad_Hz, float accel_rad_s2, float& omegaOut_rad_s)
     {
-        if (++mTimer < 15000)
+        omegaOut_rad_s = mRampSpeed.update(omegaRef_rad_Hz, accel_rad_s2);
+        return std::abs(omegaOut_rad_s - omegaRef_rad_Hz) < Config::SETTLE_THRESHOLD_RAD_S;
+    }
+
+    bool measureRs(float Id_A, float Iq_A, float Ud_V)
+    {
+        if (++mTimer < Config::RS_SETTLE_TICKS)
             return false;
 
         if (std::abs(Iq_A) > (mTargetCurrent_A * 0.05f))
@@ -239,7 +240,7 @@ class AutoSetup
         mUdSum += Ud_V;
         mIdSum += Id_A;
 
-        if (++mSamples >= 10000)
+        if (++mSamples >= Config::RS_MEASURE_SAMPLES)
         {
             float meanI = mIdSum / mSamples;
             float meanU = mUdSum / mSamples;
@@ -259,9 +260,9 @@ class AutoSetup
         return false;
     }
 
-    bool measureLs(float Id_A)
+    bool measureLs(float Id_A, float& UdInject_V)
     {
-        constexpr float omega_rad_Hz = 2.0f * math::PI * 1000.0f;
+        constexpr float omega_rad_Hz = 2.0f * math::PI * Config::LS_INJECTION_FREQ_HZ;
 
         if (mInjectionVoltage_V == 0.0f)
         {
@@ -269,7 +270,7 @@ class AutoSetup
         }
 
         mTime_s += mPwmPeriod_s;
-        mLastUdCommand_V = mInjectionVoltage_V * math::sin(omega_rad_Hz * mTime_s);
+        UdInject_V = mInjectionVoltage_V * math::sin(omega_rad_Hz * mTime_s);
         mMeasuredCurrentPeak_A = std::max(mMeasuredCurrentPeak_A, std::abs(Id_A));
 
         if (mSamples == 0)
@@ -278,7 +279,7 @@ class AutoSetup
             return false;
         }
 
-        if (++mSamples > 10000)
+        if (++mSamples > Config::LS_MEASURE_SAMPLES)
         {
             const float reactance_ohm =
                 std::sqrt(std::max(0.0f,
@@ -306,19 +307,20 @@ class AutoSetup
         mIqSum += Iq_A;
         mOmegaSum += omega_rad_Hz;
 
-        if (++mSamples >= 20000)
+        if (++mSamples >= Config::PSI_MEASURE_SAMPLES)
         {
             float avgUq = mUqSum / mSamples;
             float avgId = mIdSum / mSamples;
             float avgIq = mIqSum / mSamples;
             float avgOmega = mOmegaSum / mSamples;
 
-            // Psi = (Uq - Rs*Iq) / omega - Ld*Id
-            // Using RTotal_ohm because Uq is the duty-cycle applied voltage
+            // Calculation based on:
+            // Uq = Rs * Iq + omega * (Ld * Id + Psi_pm)
+            // Psi_pm = (Uq - Rs * Iq) / omega - Ld * Id
             mParams.flux_pm_Wb =
                 (avgUq - (mParams.RTotal_ohm * avgIq)) / avgOmega - (mParams.Ld_H * avgId);
 
-            // Safety: Ensure flux is positive (absolute value)
+            // Safety: Ensure flux is positive.
             mParams.flux_pm_Wb = std::abs(mParams.flux_pm_Wb);
 
             return true;
@@ -343,22 +345,22 @@ class AutoSetup
         }
     }
 
-    bool rampVoltageDown()
+    bool rampVoltageDown(float& UdInject_V)
     {
-        constexpr float omegaInjection_rad_Hz = 2.0f * math::PI * 1000.0f;
+        constexpr float omegaInjection_rad_Hz = 2.0f * math::PI * Config::LS_INJECTION_FREQ_HZ;
         if (++mTimer > 200)
         {
             mTimer = 0;
             mInjectionVoltage_V = std::max(0.0f, mInjectionVoltage_V - 0.1f);
         }
         mTime_s += mPwmPeriod_s;
-        mLastUdCommand_V = mInjectionVoltage_V * math::sin(omegaInjection_rad_Hz * mTime_s);
+        UdInject_V = mInjectionVoltage_V * math::sin(omegaInjection_rad_Hz * mTime_s);
         return (mInjectionVoltage_V <= 0.0f);
     }
 
     bool averageOffset(float ref, float fb, float& result)
     {
-        if (++mTimer < 10000)
+        if (++mTimer < Config::ALIGN_SETTLE_SAMPLES)
             return false;
         float diff = ref - fb;
         // Wrap difference to [-PI, PI]
@@ -367,10 +369,10 @@ class AutoSetup
         while (diff < -math::PI)
             diff += 2.0f * math::PI;
 
-        mOffsetSum += diff;
-        if (++mSamples >= 20000)
+        mOffsetSum_rad += diff;
+        if (++mSamples >= Config::ALIGN_SETTLE_SAMPLES)
         {
-            result = mOffsetSum / mSamples;
+            result = mOffsetSum_rad / mSamples;
             return true;
         }
         return false;
@@ -378,7 +380,7 @@ class AutoSetup
 
     void calculateFinalOffset()
     {
-        float finalRad = (mOffsetFwd + mOffsetBwd) * 0.5f;
+        float finalRad = (mOffsetFwd_rad + mOffsetBwd_rad) * 0.5f;
         float ticksPerRev = static_cast<float>(mParams.encoderTicks);
         float polePairs = static_cast<float>(mParams.polePairs);
 
@@ -401,9 +403,12 @@ class AutoSetup
         mTimer = 0;
         mSamples = 0;
         mUdSum = 0;
+        mUqSum = 0;
         mIdSum = 0;
+        mIqSum = 0;
+        mOmegaSum = 0;
         mMeasuredCurrentPeak_A = 0;
-        mOffsetSum = 0;
+        mOffsetSum_rad = 0;
     }
 
     MotorParams& mParams;
@@ -413,24 +418,18 @@ class AutoSetup
 
     float mPwmPeriod_s;
     float mTargetCurrent_A{0};
+    float mTime_s{0};
+    float mInjectionVoltage_V{0.0f};
+    float mMeasuredCurrentPeak_A{0};
     float mUdSum{0};
     float mUqSum{0};
+    float mIdSum{0};
     float mIqSum{0};
     float mOmegaSum{0};
-    float mIdSum{0};
-    float mTime_s{0};
-    float mMeasuredCurrentPeak_A{0};
-    float mInjectionVoltage_V{0.0f};
-    uint32_t mTimer{0}, mSamples{0};
-    float mLastUdCommand_V{0.0f};
-    //
-    float mOffsetFwd{0.0f};
-    float mOffsetBwd{0.0f};
-    float mOffsetSum{0.0f};
-    float mAlignSpeed_rad_Hz{300.0f};
-    float thetaOpenLoop{0.0f};
-    float thetaEncoder{0.0f};
-
-    float mOmegaDebug_rad_Hz{0.0f};
+    float mOffsetFwd_rad{0.0f};
+    float mOffsetBwd_rad{0.0f};
+    float mOffsetSum_rad{0.0f};
+    uint32_t mTimer{0};
+    uint32_t mSamples{0};
 };
 } // namespace app
