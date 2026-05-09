@@ -25,6 +25,9 @@ class AutoSetup
         PI_TUNE,
         ALIGN_FWD,
         ALIGN_BWD,
+        SPEED_RAMP_DOWN,
+        PSI_MEASUREMENT,
+        SPEED_RAMP_DOWN2,
         FINISHED
     };
 
@@ -122,20 +125,59 @@ class AutoSetup
 
             case State::ALIGN_BWD:
                 idRefOut_A = mTargetCurrent_A;
-                omegaRef_rad_Hz = mRampSpeed.update(-mAlignSpeed_rad_Hz, 150.0f);
-                mOmegaDebug_rad_Hz = omegaRef_rad_Hz;
+                omegaRef_rad_Hz = mRampSpeed.update(-mAlignSpeed_rad_Hz, 200.0f);
                 if (std::abs(omegaRef_rad_Hz + mAlignSpeed_rad_Hz) < 0.1f)
                 {
                     if (averageOffset(thetaOpenLoop, thetaEncoder, mOffsetBwd))
                     {
                         calculateFinalOffset();
-                        mState = State::FINISHED;
+                        mState = State::SPEED_RAMP_DOWN;
                         resetPhase();
                     }
                 }
                 break;
 
+            case State::SPEED_RAMP_DOWN:
+                idRefOut_A = mTargetCurrent_A;
+                omegaRef_rad_Hz = mRampSpeed.update(0.0f, 1000.0f);
+                if (std::abs(omegaRef_rad_Hz) < 0.1f)
+                {
+                    mState = State::PSI_MEASUREMENT;
+                    resetPhase();
+                }
+                break;
+
+            case State::PSI_MEASUREMENT:
+                idRefOut_A = mTargetCurrent_A;
+                omegaRef_rad_Hz = mRampSpeed.update(-mAlignSpeed_rad_Hz, 200.0f);
+                if (std::abs(omegaRef_rad_Hz + mAlignSpeed_rad_Hz) < 0.1f)
+                {
+                    if (measurePsi(Id_A, Iq_A, UqApplied_V, omegaRef_rad_Hz))
+                    {
+                        mState = State::SPEED_RAMP_DOWN2;
+                        resetPhase();
+                    }
+                }
+                break;
+
+            case State::SPEED_RAMP_DOWN2:
+                idRefOut_A = mTargetCurrent_A;
+                omegaRef_rad_Hz = mRampSpeed.update(0.0f, 1000.0f);
+                if (std::abs(omegaRef_rad_Hz) < 0.1f)
+                {
+                    mState = State::FINISHED;
+                    resetPhase();
+                }
+                break;
+
             case State::FINISHED:
+                idRefOut_A = 0.0f;
+                iqRefOut_A = 0.0f;
+                udInjectOut_V = 0.0f;
+                uqInjectOut_V = 0.0f;
+                bypassControl = false;
+                triggerTune = false;
+                omegaRef_rad_Hz = 0.0f;
             default:
                 break;
         }
@@ -253,6 +295,37 @@ class AutoSetup
         return false;
     }
 
+    bool measurePsi(float Id_A, float Iq_A, float Uq_V, float omega_rad_Hz)
+    {
+        // Add safety check for zero speed to avoid division by zero
+        if (std::abs(omega_rad_Hz) < 1.0f)
+            return false;
+
+        mUqSum += Uq_V;
+        mIdSum += Id_A;
+        mIqSum += Iq_A;
+        mOmegaSum += omega_rad_Hz;
+
+        if (++mSamples >= 20000)
+        {
+            float avgUq = mUqSum / mSamples;
+            float avgId = mIdSum / mSamples;
+            float avgIq = mIqSum / mSamples;
+            float avgOmega = mOmegaSum / mSamples;
+
+            // Psi = (Uq - Rs*Iq) / omega - Ld*Id
+            // Using RTotal_ohm because Uq is the duty-cycle applied voltage
+            mParams.flux_pm_Wb =
+                (avgUq - (mParams.RTotal_ohm * avgIq)) / avgOmega - (mParams.Ld_H * avgId);
+
+            // Safety: Ensure flux is positive (absolute value)
+            mParams.flux_pm_Wb = std::abs(mParams.flux_pm_Wb);
+
+            return true;
+        }
+        return false;
+    }
+
     void handleVoltageSearch()
     {
         if (++mTimer > 200)
@@ -341,6 +414,9 @@ class AutoSetup
     float mPwmPeriod_s;
     float mTargetCurrent_A{0};
     float mUdSum{0};
+    float mUqSum{0};
+    float mIqSum{0};
+    float mOmegaSum{0};
     float mIdSum{0};
     float mTime_s{0};
     float mMeasuredCurrentPeak_A{0};

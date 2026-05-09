@@ -160,6 +160,11 @@ class Control
         return mMotorParams.Lq_H;
     }
 
+    float getPsi_pm_Wb() const
+    {
+        return mMotorParams.flux_pm_Wb;
+    }
+
     uint16_t getEncoderOffset_ticks() const
     {
         return mMotorParams.encoderOffset_ticks;
