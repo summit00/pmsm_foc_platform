@@ -1,12 +1,6 @@
-#pragma once
-#include "interfaces.hpp"
-#include "motor_model.hpp"
-#include <cmath>
-#include <numbers>
-
+// sim_encoder.hpp
 namespace sim
 {
-
 class SimEncoder : public app::IEncoder
 {
   public:
@@ -15,17 +9,20 @@ class SimEncoder : public app::IEncoder
     {
     }
 
+    // New method to set the alignment offset
+    void set_alignment_offset(float offset_rad)
+    {
+        mOffset_rad = offset_rad;
+    }
+
     uint16_t read_raw() const override
     {
-        // currently inverse becasue in QEI_sensor is a hardcode inverse for the Physical sensor.
-        // float processed_ticks = mMaxTicks_count - static_cast<float>(corrected_ticks);
-        // TODO: fix in QEI_sensor and remove minus here.
-        float thetaMech = -mMotor.getState().mThetaMech_rad;
+        float thetaMech = -mMotor.getState().mThetaMech_rad + mOffset_rad;
 
-        float normalizedTheta = thetaMech;
+        float normalizedTheta = std::fmod(thetaMech, math::TWO_PI);
         if (normalizedTheta < 0.0f)
         {
-            normalizedTheta += math::TWO_PI; //
+            normalizedTheta += math::TWO_PI;
         }
 
         float ticks = (normalizedTheta / math::TWO_PI) * mMaxTicks_count;
@@ -35,13 +32,12 @@ class SimEncoder : public app::IEncoder
 
     void reset() override
     {
-        // Not strictly needed for the pure physics sim, but satisfies interface
     }
 
   private:
     const MotorModel& mMotor;
     uint32_t mMaxTicks_count;
     float mPolePairs_count;
+    float mOffset_rad{0.0f}; // Default to no offset
 };
-
 } // namespace sim

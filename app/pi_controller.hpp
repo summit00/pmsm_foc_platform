@@ -51,7 +51,7 @@ class PIController
     std::array<float, 2> calculatePIGains(float R, float L, float Ts)
     {
         float Kp = L / (2.0f * Ts);
-        float Ki = L / R;
+        float Ki = (R * Ts) / L;
 
         return {Kp, Ki};
     }

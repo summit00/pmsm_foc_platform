@@ -36,18 +36,19 @@ class Control
                      IEnableOutput& gate_enable,
                      IEncoder& encoder,
                      MotorParams& motor_params,
-                     UserInterface& ui)
+                     UserInterface& ui,
+                     float pwmPeriod_s)
         : mAdcSense(adc_sense), mInverter(inverter), mGateEnable(gate_enable),
-          mMotorParams(motor_params), mFoc(motor_params), mUi(ui),
-          mOpenLoopSensor(1.0f / 20000.0f, mOmegaRef_rad_Hz, mMotorEnabled_bool),
+          mMotorParams(motor_params), mFoc(motor_params, pwmPeriod_s), mUi(ui),
+          mOpenLoopSensor(pwmPeriod_s, mOmegaRef_rad_Hz, mMotorEnabled_bool),
           mEncoderSensor(encoder,
-                         1.0f / 20000.0f,
+                         pwmPeriod_s,
                          motor_params.polePairs,
-                         2000.0f,
+                         static_cast<float>(motor_params.encoderTicks),
                          motor_params.encoderOffset_ticks),
-          mEmkObserver(1.0f / 20000.0f, motor_params),
+          mEmkObserver(pwmPeriod_s, motor_params),
           mSensorSelector(mOpenLoopSensor, mEncoderSensor, mEmkObserver), mFaultManager(),
-          mSpeedRamp(1.0f / 20000.0f)
+          mSpeedRamp(pwmPeriod_s), mAutoSetup(mMotorParams, pwmPeriod_s)
     {
         mUdcBus_V = mAdcSense.read_bus_voltage();
         mTemp_C = mAdcSense.read_temperature_celsius();
@@ -64,9 +65,9 @@ class Control
         return mIqRef_A;
     }
 
-    float getOmegaRef_rpm() const
+    float getOmegaRef_rad_Hz() const
     {
-        return mOmegaRef_rad_Hz * (30.0f / std::numbers::pi_v<float>) / mMotorParams.polePairs;
+        return mOmegaRef_rad_Hz;
     }
 
     uint8_t getMode() const
@@ -119,6 +120,11 @@ class Control
         return mOpenLoopSensor.getTheta_rad();
     }
 
+    float getOpenLoopOmega_rad_Hz() const
+    {
+        return mOpenLoopSensor.getOmega_rad_Hz();
+    }
+
     float getEncoderTheta_rad() const
     {
         return mEncoderSensor.getTheta_rad();
@@ -132,6 +138,11 @@ class Control
     float getEmkObserverTheta_rad() const
     {
         return mEmkObserver.getTheta_rad();
+    }
+
+    float getEmkObserverOmega_rad_Hz() const
+    {
+        return mEmkObserver.getOmega_rad_Hz();
     }
 
     float getRs_ohm() const
@@ -149,20 +160,165 @@ class Control
         return mMotorParams.Lq_H;
     }
 
+    float getPsi_pm_Wb() const
+    {
+        return mMotorParams.flux_pm_Wb;
+    }
+
+    uint16_t getEncoderOffset_ticks() const
+    {
+        return mMotorParams.encoderOffset_ticks;
+    }
+
+    uint8_t getAutoSetupState() const
+    {
+        return static_cast<uint8_t>(mAutoSetup.getState());
+    }
+
     void run_isr()
     {
         readUserCommands();
+        calculateSpeed();
 
-        if (mMotorEnabled_bool && mMode != Mode::AUTOSETUP)
+        PhaseCurrents currents = readHardwareAndCheckFaults();
+
+        handleEnableTransition();
+
+        std::tie(mIalpha_A, mIbeta_A) = mTransforms.clarke(currents.ia_A, currents.ic_A);
+        setSensorlessData();
+
+        mSensorSelector.updateAllSensors();
+        float activeTheta_rad = mSensorSelector.getActiveTheta_rad();
+        float activeOmega_rad_Hz = mSensorSelector.getActiveOmega_rad_Hz();
+
+        angleError = math::compute_angle_error(mOpenLoopSensor.getTheta_rad(),
+                                               mEncoderSensor.getTheta_rad()) *
+                     360.0f / math::TWO_PI;
+
+        std::tie(mId_A, mIq_A) = mTransforms.park(mIalpha_A, mIbeta_A, activeTheta_rad);
+
+        bool bypassCurrentControl = false;
+        float injectedUd_V = 0.0f;
+        float injectedUq_V = 0.0f;
+
+        switch (mMode)
         {
-            mOmegaRef_rad_Hz = mSpeedRamp.update(mTargetOmega_rad_Hz, mAcceleration_rad_Hz2);
+            case Mode::OPENLOOP:
+                mIdRef_A = mIsAbs_A;
+                mIqRef_A = 0.0f;
+                break;
+
+            case Mode::CLOSEDLOOP:
+                if (++mSpeedLoopCounter_count >= mSpeedLoopDivider_count)
+                {
+                    mSpeedLoopCounter_count = 0;
+                    std::tie(mIdRef_A, mIqRef_A) = mFoc.runSpeedControl(
+                        mOmegaRef_rad_Hz, activeOmega_rad_Hz, mIsAbs_A, mMotorEnabled_bool);
+                }
+                break;
+
+            case Mode::AUTOSETUP:
+                if (mMotorEnabled_bool)
+                {
+                    if (mAutoSetup.getState() == AutoSetup::State::IDLE)
+                    {
+                        mAutoSetup.startAutoSetup(mIsAbs_A);
+                        mFoc.setCurrentControlGainsManual(0.5f, 0.01f);
+                    }
+
+                    float thetaOpenLoop_rad = mOpenLoopSensor.getTheta_rad();
+                    float thetaEncoder_rad = mEncoderSensor.getTheta_rad();
+                    mAutoSetupRefs = mAutoSetup.step(
+                        mId_A, mIq_A, mUd_V, mUq_V, thetaOpenLoop_rad, thetaEncoder_rad);
+
+                    mIdRef_A = mAutoSetupRefs.IdRef_A;
+                    mIqRef_A = mAutoSetupRefs.IqRef_A;
+                    injectedUd_V = mAutoSetupRefs.UdInject_V;
+                    injectedUq_V = mAutoSetupRefs.UqInject_V;
+                    bypassCurrentControl = mAutoSetupRefs.BypassCurrentControl;
+                    mOmegaRef_rad_Hz = mAutoSetupRefs.OmegaRef_rad_Hz;
+                    mSensorSelector.selectSensor(
+                        static_cast<SensorSelector::SensorType>(mAutoSetupRefs.sensorMode));
+
+                    if (mAutoSetupRefs.TriggerTuning)
+                    {
+                        mFoc.setCurrentControlGains();
+                    }
+                }
+                break;
+        }
+
+        if (!mAutoSetupRefs.BypassCurrentControl)
+        {
+            std::tie(mUd_V, mUq_V) = mFoc.runCurrentControl(mIdRef_A,
+                                                            mIqRef_A,
+                                                            mId_A,
+                                                            mIq_A,
+                                                            activeOmega_rad_Hz,
+                                                            mUsLimit_V,
+                                                            mMotorEnabled_bool);
+
+            mUd_V += injectedUd_V;
+            mUq_V += injectedUq_V;
+        }
+        else
+        {
+            mUd_V = injectedUd_V;
+            mUq_V = injectedUq_V;
+        }
+
+        std::tie(mUalpha_V, mUbeta_V) = mTransforms.inversePark(mUd_V, mUq_V, activeTheta_rad);
+        auto [Va_V, Vb_V, Vc_V] = mTransforms.inverseClarke(mUalpha_V, mUbeta_V);
+
+        mInverter.set_phase_voltages(Va_V, Vb_V, Vc_V, mUdcBus_V, mMotorEnabled_bool);
+
+        updateTelemetry();
+    }
+
+  private:
+    void setSensorlessData()
+    {
+        mMotorParams.Ialpha_A = mIalpha_A;
+        mMotorParams.Ibeta_A = mIbeta_A;
+        mMotorParams.Ualpha_V = mUalpha_V;
+        mMotorParams.Ubeta_V = mUbeta_V;
+    }
+
+    void handleEnableTransition()
+    {
+        if (mCmdMotorEnabled_bool != mMotorEnabled_bool)
+        {
+            mMotorEnabled_bool = mCmdMotorEnabled_bool;
+            mGateEnable.set_enable(mMotorEnabled_bool);
+
+            if (!mMotorEnabled_bool)
+            {
+                mFoc.resetFoc();
+                mSensorSelector.updateAllSensors();
+                mAutoSetup.reset();
+                return;
+            }
+        }
+    }
+
+    void calculateSpeed()
+    {
+        if (mMotorEnabled_bool)
+        {
+            if (mMode != Mode::AUTOSETUP)
+            {
+                mOmegaRef_rad_Hz = mSpeedRamp.update(mTargetOmega_rad_Hz, mAcceleration_rad_Hz2);
+            }
         }
         else
         {
             mSpeedRamp.reset(0.0f);
             mOmegaRef_rad_Hz = 0.0f;
         }
+    }
 
+    PhaseCurrents readHardwareAndCheckFaults()
+    {
         PhaseCurrents currents = mAdcSense.read_amps();
         mUdcBus_V = mAdcSense.read_bus_voltage();
         mUsLimit_V = mUdcBus_V * math::INV_SQRT_3;
@@ -177,86 +333,9 @@ class Control
             mUi.mEnable = 0;
         }
 
-        if (mCmdMotorEnabled_bool != mMotorEnabled_bool)
-        {
-            mMotorEnabled_bool = mCmdMotorEnabled_bool;
-            mGateEnable.set_enable(mMotorEnabled_bool);
-
-            if (!mMotorEnabled_bool)
-            {
-                mFoc.resetFoc();
-                mSensorSelector.updateAllSensors();
-                mAutoSetup.reset();
-                return;
-            }
-        }
-
-        std::tie(mIalpha_A, mIbeta_A) = mTransforms.clarke(currents.ia_A, currents.ic_A);
-        mMotorParams.Ialpha_A = mIalpha_A;
-        mMotorParams.Ibeta_A = mIbeta_A;
-        mMotorParams.Ualpha_V = mUalpha_V;
-        mMotorParams.Ubeta_V = mUbeta_V;
-
-        mSensorSelector.updateAllSensors();
-
-        float activeTheta_rad = mSensorSelector.getActiveTheta_rad();
-        float activeOmega_rad_Hz = mSensorSelector.getActiveOmega_rad_Hz();
-
-        std::tie(mId_A, mIq_A) = mTransforms.park(mIalpha_A, mIbeta_A, activeTheta_rad);
-
-        if (mMode == Mode::OPENLOOP)
-        {
-            mIdRef_A = mIsAbs_A;
-            mIqRef_A = 0.0f;
-        }
-        else if (mMode == Mode::CLOSEDLOOP)
-        {
-            if (++mSpeedLoopCounter_count >= mSpeedLoopDivider_count)
-            {
-                mSpeedLoopCounter_count = 0;
-                std::tie(mIdRef_A, mIqRef_A) = mFoc.runSpeedControl(
-                    mOmegaRef_rad_Hz, activeOmega_rad_Hz, -mIsAbs_A, mIsAbs_A, mMotorEnabled_bool);
-            }
-        }
-
-        else if (mMode == Mode::AUTOSETUP and mMotorEnabled_bool)
-        {
-            mSensorSelector.selectSensor(SensorSelector::SensorType::OpenLoop);
-
-            if (mAutoSetup.getState() == AutoSetup::State::IDLE)
-            {
-                mAutoSetup.startAutoSetup(mIsAbs_A);
-            }
-
-            auto [ud, uq] = mAutoSetup.run(mId_A, mIq_A, mUd_V, mUq_V, mUsLimit_V);
-            mUd_V = ud;
-            mUq_V = uq;
-        }
-
-        if (mMode != Mode::AUTOSETUP)
-        {
-            std::tie(mUd_V, mUq_V) = mFoc.runCurrentControl(mIdRef_A,
-                                                            mIqRef_A,
-                                                            mId_A,
-                                                            mIq_A,
-                                                            activeOmega_rad_Hz,
-                                                            mUsLimit_V,
-                                                            mMotorEnabled_bool);
-        }
-
-        std::tie(mUalpha_V, mUbeta_V) = mTransforms.inversePark(mUd_V, mUq_V, activeTheta_rad);
-        auto [Va_V, Vb_V, Vc_V] = mTransforms.inverseClarke(mUalpha_V, mUbeta_V);
-
-        mInverter.set_phase_voltages(Va_V, Vb_V, Vc_V, mUdcBus_V, mMotorEnabled_bool);
-
-        if (++mTelemetryCounter_count >= 50)
-        {
-            mTelemetryCounter_count = 0;
-            writeUserTelemetry();
-        }
+        return currents;
     }
 
-  private:
     void readUserCommands()
     {
         mCmdMotorEnabled_bool = static_cast<bool>(mUi.mEnable);
@@ -265,7 +344,7 @@ class Control
         if (newMode != mMode)
         {
             mMode = newMode;
-            if (mMode == Mode::OPENLOOP)
+            if (mMode == Mode::OPENLOOP or mMode == Mode::AUTOSETUP)
             {
                 mSensorSelector.selectSensor(SensorSelector::SensorType::OpenLoop);
             }
@@ -304,6 +383,15 @@ class Control
         mUi.IqRef_A = mIqRef_A;
     }
 
+    void updateTelemetry()
+    {
+        if (++mTelemetryCounter_count >= 50)
+        {
+            mTelemetryCounter_count = 0;
+            writeUserTelemetry();
+        }
+    }
+
     IADC& mAdcSense;
     IInverter& mInverter;
     IEnableOutput& mGateEnable;
@@ -321,7 +409,7 @@ class Control
     Transforms mTransforms;
     FaultManager mFaultManager;
     RampGenerator mSpeedRamp;
-    AutoSetup mAutoSetup{mMotorParams, mFoc, 1.0f / 20000.0f};
+    AutoSetup mAutoSetup;
 
     // Control Variables
     float mTargetOmega_rad_Hz{0.0f};
@@ -342,16 +430,18 @@ class Control
     float mTemp_C{0.0f};
     float mUsLimit_V{};
     uint8_t mIsErrorrState{};
-
     // State Variables
     Mode mMode{Mode::OPENLOOP};
     bool mMotorEnabled_bool{false};
     bool mCmdMotorEnabled_bool{false};
+    AutoSetupReferences mAutoSetupRefs;
 
     // Counters
     uint8_t mTelemetryCounter_count{0};
     uint32_t mSpeedLoopCounter_count{0};
     const uint32_t mSpeedLoopDivider_count{10};
+
+    float angleError{};
 };
 
 } // namespace app

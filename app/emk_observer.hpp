@@ -13,7 +13,8 @@ namespace app
 class EmkObserver : public ISensor
 {
   public:
-    EmkObserver(float dt_s, const MotorParams& params) : mDt_s(dt_s), mParams(params)
+    EmkObserver(float pwm_Period_s, const MotorParams& params)
+        : mPwmPeriod_s(pwm_Period_s), mParams(params)
     {
     }
 
@@ -34,8 +35,8 @@ class EmkObserver : public ISensor
         float v_beta = -mK1_smo * std::sqrt(std::abs(s_beta) + 1e-6f) * ss_b + mZ_beta;
 
         // Update the integral states Z
-        mZ_alpha += -mK2_smo * ss_a * mDt_s;
-        mZ_beta += -mK2_smo * ss_b * mDt_s;
+        mZ_alpha += -mK2_smo * ss_a * mPwmPeriod_s;
+        mZ_beta += -mK2_smo * ss_b * mPwmPeriod_s;
 
         // EEMF Motor Model
         float saliency_alpha = mOmega_rad_Hz * (mParams.Ld_H - mParams.Lq_H) * mParams.Ibeta_A;
@@ -43,9 +44,9 @@ class EmkObserver : public ISensor
 
         mIalpha_est +=
             (mParams.Ualpha_V - mParams.Rs_ohm * mIalpha_est + saliency_alpha + v_alpha) /
-            mParams.Ld_H * mDt_s;
+            mParams.Ld_H * mPwmPeriod_s;
         mIbeta_est += (mParams.Ubeta_V - mParams.Rs_ohm * mIbeta_est + saliency_beta + v_beta) /
-                      mParams.Ld_H * mDt_s;
+                      mParams.Ld_H * mPwmPeriod_s;
 
         float theta_raw = std::atan2(mZ_alpha, -mZ_beta);
 
@@ -57,7 +58,8 @@ class EmkObserver : public ISensor
 
         // Simple LPF for speed to handle the derivative noise
         const float alpha_speed = 0.05f;
-        mOmega_rad_Hz = mOmega_rad_Hz * (1.0f - alpha_speed) + (delta_theta / mDt_s) * alpha_speed;
+        mOmega_rad_Hz =
+            mOmega_rad_Hz * (1.0f - alpha_speed) + (delta_theta / mPwmPeriod_s) * alpha_speed;
 
         mTheta_rad = theta_raw;
     }
@@ -83,7 +85,7 @@ class EmkObserver : public ISensor
     }
 
   private:
-    float mDt_s;
+    float mPwmPeriod_s;
     const MotorParams& mParams;
 
     float mK1_smo{1.0f};

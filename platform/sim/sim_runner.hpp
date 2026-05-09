@@ -27,18 +27,19 @@ class SimRunner
     SimRunner(const SimMotorParams& simParams,
               const ILoadModel& externalLoad,
               const std::string& logFilename = "sim_output.csv",
-              uint32_t physicsOversample_count = 10,
+              uint32_t physicsOversample_count = 4,
               float ctrlFreq_Hz = 20000.0f)
         : mCtrlFreq_Hz(20000.0f), mPhysicsDt_s(1.0f / (ctrlFreq_Hz * physicsOversample_count)),
           mStepsPerIsr_count(physicsOversample_count),
 
           // Initialize App Parameters from Sim Parameters
           mAppMotorParams{simParams.Rs_ohm,
-                          simParams.Rs_ohm,                    
+                          simParams.Rs_ohm,
                           simParams.Ld_H,
                           simParams.Lq_H,
                           simParams.fluxPm_Wb,
                           simParams.polePairs_count,
+                          2000,
                           0},
 
           // Initialize Physics
@@ -49,7 +50,13 @@ class SimRunner
           mSimGateEnable(),
 
           // Initialize the actual Controller!
-          mControl(mSimAdc, mSimInverter, mSimGateEnable, mSimEncoder, mAppMotorParams, mUi)
+          mControl(mSimAdc,
+                   mSimInverter,
+                   mSimGateEnable,
+                   mSimEncoder,
+                   mAppMotorParams,
+                   mUi,
+                   1.0f / mCtrlFreq_Hz)
     {
     }
 
@@ -83,6 +90,11 @@ class SimRunner
                             mSimInverter.getVv(),
                             mSimInverter.getVw());
         }
+    }
+
+    void setEncoderOffset(float offset_rad)
+    {
+        mSimEncoder.set_alignment_offset(offset_rad);
     }
 
     app::Control& getControl()

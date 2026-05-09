@@ -17,9 +17,20 @@ namespace app
 class FOC
 {
   public:
-    explicit FOC(const MotorParams& params) : mParams(params), precontrol(params)
+    explicit FOC(const MotorParams& params, float pwmPeriod_s)
+        : mParams(params), precontrol(params), mPwmPeriod_s(pwmPeriod_s)
     {
         setCurrentControlGains();
+    }
+
+    const PIController& getIdController() const
+    {
+        return pi_d;
+    }
+
+    const PIController& getIqController() const
+    {
+        return pi_q;
     }
 
     std::tuple<float, float> runCurrentControl(float IdRef_A,
@@ -49,20 +60,10 @@ class FOC
         return {Ud, Uq};
     }
 
-    const PIController& getIdController() const
+    std::tuple<float, float>
+    runSpeedControl(float omegaRef_rad_Hz, float omega_rad_Hz, float Iabs_A, bool motor_enabled)
     {
-        return pi_d;
-    }
-
-    const PIController& getIqController() const
-    {
-        return pi_q;
-    }
-
-    std::tuple<float, float> runSpeedControl(
-        float omegaRef_rad_Hz, float omega_rad_Hz, float outMin, float outMax, bool motor_enabled)
-    {
-        auto IqRef_A = PISpeed.compute(omegaRef_rad_Hz, omega_rad_Hz, outMin, outMax);
+        auto IqRef_A = PISpeed.compute(omegaRef_rad_Hz, omega_rad_Hz, -Iabs_A, Iabs_A);
 
         if (!motor_enabled)
         {
@@ -81,7 +82,7 @@ class FOC
 
     void setCurrentControlGains()
     {
-        auto [kp, ki] = pi_d.calculatePIGains(mParams.Rs_ohm, mParams.Ld_H, 1.0f / 20000.0f);
+        auto [kp, ki] = pi_d.calculatePIGains(mParams.RTotal_ohm, mParams.Ld_H, mPwmPeriod_s);
         pi_d.setGains(kp, ki);
         pi_q.setGains(kp, ki);
         PISpeed.setGains(0.01f, 0.0001f);
@@ -99,5 +100,6 @@ class FOC
     PIController pi_d;
     PIController pi_q;
     PIController PISpeed;
+    float mPwmPeriod_s;
 };
 } // namespace app

@@ -1,133 +1,54 @@
 {
   "version": "2.0.0",
   "tasks": [
-    // --- YOUR ORIGINAL HARDWARE TASKS ---
     {
-      "label": "Delete build Folder",
+      "label": "1. Configure Project",
       "type": "shell",
-      "command": "Remove-Item -Recurse -Force ./build",
-      "problemMatcher": [],
-    },
-    {
-      "label": "cmake: configure",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "-S",
-        ".",
-        "-B",
-        "build",
-        "-G",
-        "Ninja",
-        "-DCMAKE_BUILD_TYPE=Debug",
-        "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/cmake/arm-none-eabi-toolchain.cmake"
-      ],
-      "group": "build",
-      "problemMatcher": []
-    },
-    {
-      "label": "cmake: build",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build"
-      ],
-      "group": "build",
-      "dependsOn": [
-        "cmake: configure"
-      ],
-      "problemMatcher": [
-        "$gcc"
-      ]
-    },
-    {
-      "label": "cmake: clean",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build",
-        "--target",
-        "clean"
-      ],
-      "group": "build",
-      "problemMatcher": []
-    },
-    {
-      "label": "Flash STM32G431 (CubeProgrammer):",
-      "type": "shell",
-      "command": "C:\\Program Files\\STMicroelectronics\\STM32Cube\\STM32CubeProgrammer\\bin\\STM32_Programmer_CLI.exe",
-      "args": [
-        "-c",
-        "port=SWD",
-        "-w",
-        "${workspaceFolder}\\build\\platform\\pmsm_foc_platform.elf",
-        "-v",
-        "-rst"
-      ],
-      "problemMatcher": [],
-      "dependsOn": [
-        "cmake: build"
-      ],
-      "group": "build"
-    },
-
-    {
-      "label": "CMake: Configure Host",
-      "type": "shell",
-      "command": "cmake -S . -B build-host -G Ninja -DPLATFORM=host -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug",
-      "problemMatcher": [],
+      "command": "echo '${input:target}' > .target_config; if ('${input:target}' -eq 'stm32g431') { cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE='${workspaceFolder}/cmake/arm-none-eabi-toolchain.cmake' } else { cmake -S . -B build-host -G Ninja -DPLATFORM=host -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug }",
       "group": "build"
     },
     {
-      "label": "Build: Unit Tests",
+      "label": "2. Build Project",
       "type": "shell",
-      "command": "cmake --build build-host --target unit_tests",
-      "group": "build",
-      "dependsOn": ["CMake: Configure Host"],
-      "problemMatcher": ["$gcc"]
-    },
-    {
-      "label": "Build: SIL Simulation",
-      "type": "shell",
-      "command": "cmake --build build-host --target system_test",
-      "group": "build",
-      "dependsOn": ["CMake: Configure Host"],
-      "problemMatcher": ["$gcc"]
-    },
-    {
-      "label": "RUN: Unit Tests",
-      "type": "shell",
-      "command": "./build-host/tests/unit_tests",
-      "group": "test",
-      "dependsOn": ["Build: Unit Tests"],
-      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
-    },
-    {
-      "label": "RUN: SIL Simulation",
-      "type": "shell",
-      "command": "${workspaceFolder}/build-host/tests/sim/system_test.exe",
-      "args": ["-s"],
-      "group": "test",
-      "dependsOn": ["Build: SIL Simulation"],
-      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
-    },
-    {
-      "label": "DEBUG: Build and Run Marked Test",
-      "type": "shell",
-      "command": "./build-host/tests/sim/system_test.exe [debug] -s",
+      "command": "$target = Get-Content .target_config -ErrorAction SilentlyContinue; if (!$target) { Write-Error 'Please run Configure first!'; exit 1 }; if ($target -eq 'stm32g431') { cmake --build build } elseif ($target -eq 'SIL-Simulation') { cmake --build build-host --target system_test } else { cmake --build build-host --target unit_tests }",
       "group": {
         "kind": "build",
         "isDefault": true
       },
-      "dependsOn": ["Build: SIL Simulation"],
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "3. Flash / Run",
+      "type": "shell",
+      "dependsOn": [
+        "2. Build Project"
+      ],
+      "command": "$target = Get-Content .target_config -ErrorAction SilentlyContinue; if (!$target) { Write-Error 'Please run Configure first!'; exit 1 }; if ($target -eq 'stm32g431') { & 'C:\\Program Files\\STMicroelectronics\\STM32Cube\\STM32CubeProgrammer\\bin\\STM32_Programmer_CLI.exe' -c port=SWD -w '${workspaceFolder}\\build\\platform\\pmsm_foc_platform.elf' -v -rst } elseif ($target -eq 'SIL-Simulation') { & '${workspaceFolder}\\build-host\\tests\\sim\\system_test.exe' -s } else { & '${workspaceFolder}\\build-host\\tests\\unit_tests\\unit_tests.exe' }",
+      "group": "test",
       "presentation": {
         "reveal": "always",
         "panel": "dedicated",
         "clear": true
-      },
-      "problemMatcher": []
+      }
+    },
+    {
+  "label": "4. Delete build Folders",
+  "type": "shell",
+  "command": "Stop-Process -Name 'system_test', 'unit_tests' -ErrorAction SilentlyContinue; @('build', 'build-host', '.target_config') | ForEach-Object { if (Test-Path $_) { Remove-Item -Recurse -Force $_ -ErrorAction SilentlyContinue } }",
+  "problemMatcher": []
+},
+  ],
+  "inputs": [
+    {
+      "id": "target",
+      "type": "pickString",
+      "description": "Select Target Platform",
+      "options": [
+        "stm32g431",
+        "SIL-Simulation",
+        "Unit-Tests"
+      ],
+      "default": "stm32g431"
     }
   ]
 }

@@ -11,6 +11,7 @@
       "gdbPath": "C:\\Arm\\13.3 rel1\\bin\\arm-none-eabi-gdb.exe",
       "preLaunchTask": "cmake: build",
       "runToMain": false,
+      "preLaunchTask": "2. Build Project", 
       "device": "STM32G431",
       "svdFile": "${workspaceFolder}/STM32G431.svd",
 

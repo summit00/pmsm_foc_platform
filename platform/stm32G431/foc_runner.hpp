@@ -17,6 +17,7 @@ namespace platform
 {
 
 inline app::MotorParams motor_params{.Rs_ohm = 0.1f,
+                                     .RTotal_ohm = 0.1f,
                                      .Ld_H = 0.00016f,
                                      .Lq_H = 0.00016f,
                                      .flux_pm_Wb = 0.00408f,
@@ -34,7 +35,10 @@ inline hal::GateDriverEnable
                 {bsp::powerstage_enable_c().port, bsp::powerstage_enable_c().pin},
                 {bsp::powerstage_enable_general().port, bsp::powerstage_enable_general().pin});
 
-inline app::Control control{adc_sense, inverter, gate_enable, encoder, motor_params, ui};
+constexpr float pwmPeriod_s = 1.0f / 20000.0f;
+
+inline app::Control control{
+    adc_sense, inverter, gate_enable, encoder, motor_params, ui, pwmPeriod_s};
 
 inline void motor_control_isr()
 {

@@ -94,6 +94,11 @@ class MotorModel
         return mState;
     }
 
+    float getMotorPolePairs() const
+    {
+        return mParams.polePairs_count;
+    }
+
   private:
     MotorState calculateDerivatives(const MotorState& state, const MotorInputs& inputs) const
     {
