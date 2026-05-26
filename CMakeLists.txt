@@ -25,7 +25,18 @@ if(PLATFORM STREQUAL "host")
 
 elseif(PLATFORM STREQUAL "stm32")
     add_definitions(-DTARGET_STM32)
-    include(${CMAKE_SOURCE_DIR}/cmake/stm32g431.cmake)
+    
+    set(TARGET_BOARD "nucleoG431_ihm07" CACHE STRING "Target board: nucleoG431_ihm07|nucleoF767_ihm07")
+    set_property(CACHE TARGET_BOARD PROPERTY STRINGS nucleoG431_ihm07 nucleoF767_ihm07)
+    
+    if(TARGET_BOARD STREQUAL "nucleoG431_ihm07")
+        include(${CMAKE_SOURCE_DIR}/cmake/stm32g431.cmake)
+    elseif(TARGET_BOARD STREQUAL "nucleoF767_ihm07")
+        include(${CMAKE_SOURCE_DIR}/cmake/stm32f767.cmake)
+    else()
+        message(FATAL_ERROR "Unknown TARGET_BOARD: ${TARGET_BOARD}")
+    endif()
+    
     add_subdirectory(hal)
     add_subdirectory(bsp)
     add_subdirectory(platform)
