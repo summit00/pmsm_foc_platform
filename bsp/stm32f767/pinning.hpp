@@ -20,9 +20,9 @@ struct GpioPin
 inline constexpr GpioPin PA5{GPIOA, GPIO_PIN_5};
 
 // Powerstage enable pins
-inline constexpr GpioPin PC10{GPIOC, GPIO_PIN_10};
-inline constexpr GpioPin PC11{GPIOC, GPIO_PIN_11};
-inline constexpr GpioPin PC12{GPIOC, GPIO_PIN_12};
-inline constexpr GpioPin PA11{GPIOA, GPIO_PIN_11};
+inline constexpr GpioPin PD4{GPIOD, GPIO_PIN_4};
+inline constexpr GpioPin PD5{GPIOD, GPIO_PIN_5};
+inline constexpr GpioPin PD6{GPIOD, GPIO_PIN_6};
+inline constexpr GpioPin PD7{GPIOD, GPIO_PIN_7};
 
 } // namespace pinning

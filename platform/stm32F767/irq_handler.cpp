@@ -16,7 +16,7 @@ extern "C" void SysTick_Handler(void)
     HAL_SYSTICK_IRQHandler();
 }
 
-extern "C" void ADC1_2_IRQHandler(void)
+extern "C" void ADC_IRQHandler(void)
 {
     HAL_ADC_IRQHandler(&hadc1);
     HAL_ADC_IRQHandler(&hadc2);

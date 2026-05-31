@@ -7,6 +7,7 @@
 #include "gpio_out.hpp"
 #include "heartbeat.hpp"
 #include "stm32f7xx_hal.h"
+#include "stm32f7xx_hal_adc_ex.h"
 #include "tick.hpp"
 
 extern "C"
@@ -22,7 +23,7 @@ extern "C"
     void SystemClock_Config(void);
     void MX_GPIO_Init(void);
     void MX_TIM1_Init(void);
-    void MX_TIM2_Init(void);
+    void MX_TIM4_Init(void);
     void MX_ADC1_Init(void);
     void MX_ADC2_Init(void);
 }
@@ -30,7 +31,7 @@ extern "C"
 extern "C"
 {
     extern TIM_HandleTypeDef htim1;
-    extern TIM_HandleTypeDef htim2;
+    extern TIM_HandleTypeDef htim4;
     extern ADC_HandleTypeDef hadc1;
     extern ADC_HandleTypeDef hadc2;
 }
@@ -50,19 +51,20 @@ struct MainApp
         SystemClock_Config();
         MX_GPIO_Init();
         MX_TIM1_Init();
-        MX_TIM2_Init();
+        MX_TIM4_Init();
         MX_ADC1_Init();
         MX_ADC2_Init();
 
         // Set IRQ Priorities
-        HAL_NVIC_SetPriority(ADC1_2_IRQn, 0, 0);
+        HAL_NVIC_SetPriority(ADC_IRQn, 0, 0);
 
-        HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
-        HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED);
 
         uint32_t arr = __HAL_TIM_GET_AUTORELOAD(&htim1);
         uint32_t sample = arr - 10;
         __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, sample);
+// Start regular ADC conversions for both ADCs (required for F7 where calibration is omitted)
+        HAL_ADC_Start(&hadc1);
+        HAL_ADC_Start(&hadc2);
         HAL_ADCEx_InjectedStart(&hadc2);
         HAL_ADCEx_InjectedStart_IT(&hadc1);
 

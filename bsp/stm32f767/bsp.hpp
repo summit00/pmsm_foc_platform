@@ -17,21 +17,21 @@ namespace bsp
 
 inline constexpr pinning::GpioPin powerstage_enable_a()
 {
-    return pinning::PC10;
+    return pinning::PD5;
 }
 
 inline constexpr pinning::GpioPin powerstage_enable_b()
 {
-    return pinning::PC11;
+    return pinning::PD6;
 }
 inline constexpr pinning::GpioPin powerstage_enable_c()
 {
-    return pinning::PC12;
+    return pinning::PD7;
 }
 
 inline constexpr pinning::GpioPin powerstage_enable_general()
 {
-    return pinning::PA11;
+    return pinning::PD4;
 }
 
 } // namespace bsp

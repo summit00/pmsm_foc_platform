@@ -124,12 +124,13 @@ elseif(TARGET_BOARD STREQUAL "nucleoF767_ihm07")
     set(STARTUP_FILE  ${CUBE_DIR}/startup_stm32f767xx.s)
     set(LINKER_SCRIPT ${CUBE_DIR}/STM32F767xx_FLASH.ld)
 
+    set_source_files_properties(${CUBE_DIR}/Core/Src/main.c PROPERTIES COMPILE_DEFINITIONS "main=cube_main")
+
     set(CUBE_SOURCES
       ${CUBE_DIR}/Core/Src/gpio.c
       ${CUBE_DIR}/Core/Src/adc.c
       ${CUBE_DIR}/Core/Src/tim.c
-      ${CUBE_DIR}/Core/Src/dma.c
-      ${CUBE_DIR}/Core/Src/usart.c
+      ${CUBE_DIR}/Core/Src/usb_otg.c
       ${CUBE_DIR}/Core/Src/stm32f7xx_hal_msp.c
       ${CUBE_DIR}/Core/Src/system_stm32f7xx.c
     )
@@ -142,8 +143,6 @@ elseif(TARGET_BOARD STREQUAL "nucleoF767_ihm07")
       ${CUBE_DIR}/Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_adc_ex.c
       ${CUBE_DIR}/Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_tim.c
       ${CUBE_DIR}/Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_tim_ex.c
-      ${CUBE_DIR}/Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart.c
-      ${CUBE_DIR}/Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart_ex.c
       ${CUBE_DIR}/Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma.c
       ${CUBE_DIR}/Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc.c
       ${CUBE_DIR}/Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc_ex.c
@@ -153,6 +152,9 @@ elseif(TARGET_BOARD STREQUAL "nucleoF767_ihm07")
       ${CUBE_DIR}/Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr.c
       ${CUBE_DIR}/Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr_ex.c
       ${CUBE_DIR}/Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_cortex.c
+      ${CUBE_DIR}/Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd.c
+      ${CUBE_DIR}/Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd_ex.c
+      ${CUBE_DIR}/Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_ll_usb.c
     )
 
     target_sources(${PROJECT_NAME}.elf PRIVATE

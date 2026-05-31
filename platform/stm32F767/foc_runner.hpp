@@ -26,7 +26,7 @@ inline app::MotorParams motor_params{.Rs_ohm = 0.1f,
 
 inline hal::ADCSense adc_sense;
 inline hal::Inverter inverter(htim1);
-inline hal::EncoderQEI encoder(htim2, 2000, 4);
+inline hal::EncoderQEI encoder(htim4, 2000, 4);
 inline app::UserInterface ui;
 
 inline hal::GateDriverEnable

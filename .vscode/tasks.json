@@ -23,7 +23,7 @@
       "dependsOn": [
         "2. Build Project"
       ],
-      "command": "$target = Get-Content .target_config -ErrorAction SilentlyContinue; if (!$target) { Write-Error 'Please run Setup Project first!'; exit 1 }; if ($target -eq 'nucleoG431_ihm07') { & 'C:\\Program Files\\STMicroelectronics\\STM32Cube\\STM32CubeProgrammer\\bin\\STM32_Programmer_CLI.exe' -c port=SWD -w '${workspaceFolder}\\build\\platform\\pmsm_foc_platform.elf' -v -rst } elseif ($target -eq 'nucleoF767_ihm07') { Write-Host 'Flash for nucleoF767_ihm07 is not yet configured.' } elseif ($target -eq 'SIL-Simulation') { & '${workspaceFolder}\\build-host\\tests\\sim\\system_test.exe' -s } else { & '${workspaceFolder}\\build-host\\tests\\unit_tests\\unit_tests.exe' }",
+      "command": "$target = Get-Content .target_config -ErrorAction SilentlyContinue; if (!$target) { Write-Error 'Please run Setup Project first!'; exit 1 }; if ($target -eq 'nucleoG431_ihm07') { & 'C:\\Program Files\\STMicroelectronics\\STM32Cube\\STM32CubeProgrammer\\bin\\STM32_Programmer_CLI.exe' -c port=SWD -w '${workspaceFolder}\\build\\platform\\pmsm_foc_platform.elf' -v -rst } elseif ($target -eq 'nucleoF767_ihm07') { & 'C:\\Program Files\\STMicroelectronics\\STM32Cube\\STM32CubeProgrammer\\bin\\STM32_Programmer_CLI.exe' -c port=SWD -w '${workspaceFolder}\\build\\platform\\pmsm_foc_platform.elf' -v -rst } elseif ($target -eq 'SIL-Simulation') { & '${workspaceFolder}\\build-host\\tests\\sim\\system_test.exe' -s } else { & '${workspaceFolder}\\build-host\\tests\\unit_tests\\unit_tests.exe' }",
       "group": "test",
       "presentation": {
         "reveal": "always",
