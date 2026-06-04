@@ -9,11 +9,11 @@ namespace bsp
 // Board-Level Aliases
 // ======================
 
-// Nucleo-style status LED = PA5
-// inline constexpr pinning::GpioPin status_led()
-// {
-//     return pinning::PA5;
-// }
+// Nucleo-style status LED = PB0
+inline constexpr pinning::GpioPin status_led()
+{
+    return pinning::PB0;
+}
 
 inline constexpr pinning::GpioPin powerstage_enable_a()
 {

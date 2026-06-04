@@ -23,6 +23,7 @@ struct UserInterface
     float ThetaEncoder_deg = 0.0f;
     float ThetaOpenLoop_deg = 0.0f;
     float actualSpeedEncoder_rpm = 0.0f;
+    float Udc_V = 0.0f;
 };
 
 } // namespace app

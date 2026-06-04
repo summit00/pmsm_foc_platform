@@ -42,10 +42,10 @@ namespace app
 struct MainApp
 {
     hal::TickHal tick;
-    // hal::GpioOutHal led;
-    // app::Heartbeat hb;
+    hal::GpioOutHal led;
+    app::Heartbeat hb;
 
-    MainApp() // : led(bsp::status_led().port, bsp::status_led().pin), hb(500)
+    MainApp() : led(bsp::status_led().port, bsp::status_led().pin), hb(500)
     {
         HAL_Init();
         SystemClock_Config();
@@ -55,16 +55,22 @@ struct MainApp
         MX_ADC1_Init();
         MX_ADC2_Init();
 
+        // Clear the JAUTO bit on ADC2 to fix broken Dual ADC Injected Simultaneous mode.
+        // CubeMX mistakenly enables Automatic Injected Conversion (JAUTO) on ADC2,
+        // which prevents the simultaneous trigger from working.
+        hadc2.Instance->CR1 &= ~ADC_CR1_JAUTO;
+
         // Set IRQ Priorities
         HAL_NVIC_SetPriority(ADC_IRQn, 0, 0);
 
+        // Start regular ADC conversions for both ADCs (required for F7 where calibration is
+        // omitted)
+        // HAL_ADC_Start(&hadc1);
+        // HAL_ADC_Start(&hadc2);
 
         uint32_t arr = __HAL_TIM_GET_AUTORELOAD(&htim1);
         uint32_t sample = arr - 10;
         __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, sample);
-// Start regular ADC conversions for both ADCs (required for F7 where calibration is omitted)
-        HAL_ADC_Start(&hadc1);
-        HAL_ADC_Start(&hadc2);
         HAL_ADCEx_InjectedStart(&hadc2);
         HAL_ADCEx_InjectedStart_IT(&hadc1);
 
@@ -80,12 +86,13 @@ struct MainApp
         hal::DwtCycleCounter::enable();
 
         // Initialize heartbeat
-        // hb.start(tick);
+        hb.start(tick);
     }
 
     // Run the main loop
     void loop()
     {
+        hb.update(tick, led);
     }
 };
 } // namespace app

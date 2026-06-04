@@ -191,9 +191,13 @@ class Control
         float activeTheta_rad = mSensorSelector.getActiveTheta_rad();
         float activeOmega_rad_Hz = mSensorSelector.getActiveOmega_rad_Hz();
 
-        angleError = math::compute_angle_error(mOpenLoopSensor.getTheta_rad(),
-                                               mEncoderSensor.getTheta_rad()) *
-                     360.0f / math::TWO_PI;
+        // angleError = math::compute_angle_error(mOpenLoopSensor.getTheta_rad(),
+        //                                        mEncoderSensor.getTheta_rad()) *
+        //              360.0f / math::TWO_PI;
+        angleError = angleError + 1;
+
+        if (angleError > 100000)
+            angleError = 0;
 
         std::tie(mId_A, mIq_A) = mTransforms.park(mIalpha_A, mIbeta_A, activeTheta_rad);
 
@@ -381,6 +385,7 @@ class Control
         mUi.Iq_A = mIq_A;
         mUi.IdRef_A = mIdRef_A;
         mUi.IqRef_A = mIqRef_A;
+        mUi.Udc_V = mUdcBus_V;
     }
 
     void updateTelemetry()

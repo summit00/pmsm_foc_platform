@@ -17,7 +17,7 @@ struct GpioPin
 // ======================
 
 // Nucleo LED Pin
-inline constexpr GpioPin PA5{GPIOA, GPIO_PIN_5};
+inline constexpr GpioPin PB0{GPIOB, GPIO_PIN_0};
 
 // Powerstage enable pins
 inline constexpr GpioPin PD4{GPIOD, GPIO_PIN_4};

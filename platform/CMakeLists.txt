@@ -105,10 +105,14 @@ elseif(TARGET_BOARD STREQUAL "nucleoF767_ihm07")
 
   target_include_directories(${PROJECT_NAME}.elf PRIVATE
     ${CUBE_DIR}/Core/Inc
+    ${CUBE_DIR}/USB_DEVICE/App
+    ${CUBE_DIR}/USB_DEVICE/Target
     ${CUBE_DIR}/Drivers/STM32F7xx_HAL_Driver/Inc
     ${CUBE_DIR}/Drivers/STM32F7xx_HAL_Driver/Inc/Legacy
     ${CUBE_DIR}/Drivers/CMSIS/Device/ST/STM32F7xx/Include
     ${CUBE_DIR}/Drivers/CMSIS/Include
+    ${CUBE_DIR}/Middlewares/ST/STM32_USB_Device_Library/Core/Inc
+    ${CUBE_DIR}/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc
     ${CUBE_DIR}/Drivers/BSP/STM32F7xx_Nucleo
 
     ${CMAKE_CURRENT_SOURCE_DIR}/stm32F767
@@ -130,7 +134,6 @@ elseif(TARGET_BOARD STREQUAL "nucleoF767_ihm07")
       ${CUBE_DIR}/Core/Src/gpio.c
       ${CUBE_DIR}/Core/Src/adc.c
       ${CUBE_DIR}/Core/Src/tim.c
-      ${CUBE_DIR}/Core/Src/usb_otg.c
       ${CUBE_DIR}/Core/Src/stm32f7xx_hal_msp.c
       ${CUBE_DIR}/Core/Src/system_stm32f7xx.c
     )
@@ -157,9 +160,21 @@ elseif(TARGET_BOARD STREQUAL "nucleoF767_ihm07")
       ${CUBE_DIR}/Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_ll_usb.c
     )
 
+    set(USB_SOURCES
+      ${CUBE_DIR}/USB_DEVICE/Target/usbd_conf.c
+      ${CUBE_DIR}/USB_DEVICE/App/usb_device.c
+      ${CUBE_DIR}/USB_DEVICE/App/usbd_desc.c
+      ${CUBE_DIR}/USB_DEVICE/App/usbd_cdc_if.c
+      ${CUBE_DIR}/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c
+      ${CUBE_DIR}/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c
+      ${CUBE_DIR}/Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ioreq.c
+      ${CUBE_DIR}/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c
+    )
+
     target_sources(${PROJECT_NAME}.elf PRIVATE
       ${CUBE_SOURCES}
       ${HAL_SOURCES}
+      ${USB_SOURCES}
       ${STARTUP_FILE}
       stm32F767/main.cpp
       stm32F767/irq_handler.cpp
