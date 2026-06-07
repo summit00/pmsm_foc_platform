@@ -31,6 +31,17 @@
         "clear": true
       }
     },
+        {
+      "label": "3b. Erase Chip",
+      "type": "shell",
+      "command": "$target = Get-Content .target_config -ErrorAction SilentlyContinue; if (!$target) { Write-Error 'Please run Setup Project first!'; exit 1 }; if ($target -eq 'nucleoG431_ihm07' -or $target -eq 'nucleoF767_ihm07') { & 'C:\\Program Files\\STMicroelectronics\\STM32Cube\\STM32CubeProgrammer\\bin\\STM32_Programmer_CLI.exe' -c port=SWD -e all } else { Write-Host 'Target is a host simulation/test. Erase skipped.' }",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
     {
       "label": "4. Delete build Folders",
       "type": "shell",

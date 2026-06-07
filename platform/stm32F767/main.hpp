@@ -71,19 +71,20 @@ struct MainApp
         uint32_t arr = __HAL_TIM_GET_AUTORELOAD(&htim1);
         uint32_t sample = arr - 10;
         __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, sample);
-        HAL_ADCEx_InjectedStart(&hadc2);
-        HAL_ADCEx_InjectedStart_IT(&hadc1);
 
         HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
         HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
         HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
         HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
 
+        HAL_ADCEx_InjectedStart(&hadc2);
+        HAL_ADCEx_InjectedStart_IT(&hadc1);
+
+        hal::DwtCycleCounter::enable();
+
         platform::init_encoder();
 
         platform::calibrate_current_sense();
-
-        hal::DwtCycleCounter::enable();
 
         // Initialize heartbeat
         hb.start(tick);
@@ -92,7 +93,8 @@ struct MainApp
     // Run the main loop
     void loop()
     {
-        hb.update(tick, led);
+        while (true)
+            hb.update(tick, led);
     }
 };
 } // namespace app

@@ -1,5 +1,6 @@
 #pragma once
 #include "adc_sense_config.hpp"
+#include "dwt_cycle_counter.hpp"
 #include "interfaces.hpp"
 #include <array>
 #include <cstdint>
@@ -62,11 +63,7 @@ class ADCSense : public app::IADC
         {
             sum_a += ia_counts;
             sum_b += ic_counts;
-            // Small busy-wait — calibration happens once in main(), not ISR
-            for (uint32_t d = 0; d < 1000; ++d)
-            {
-                // __asm volatile("nop");
-            }
+            hal::DwtCycleCounter::delay_us(200);
         }
 
         cfg.adc_ia_offset = static_cast<uint16_t>(sum_a / N);
@@ -76,10 +73,10 @@ class ADCSense : public app::IADC
   private:
     BoardSensorsConfig cfg{};
 
-    static inline uint16_t ia_counts = 0;
-    static inline uint16_t ic_counts = 0;
-    static inline uint16_t vbus_counts = 0;
-    static inline uint16_t temp_counts = 0;
+    static inline volatile uint16_t ia_counts = 0;
+    static inline volatile uint16_t ic_counts = 0;
+    static inline volatile uint16_t vbus_counts = 0;
+    static inline volatile uint16_t temp_counts = 0;
 };
 
 } // namespace hal

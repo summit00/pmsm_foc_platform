@@ -27,10 +27,11 @@ class EncoderQEI : public app::IEncoder
 
     uint16_t read_raw() const override
     {
-        // TIM2 is 32-bit counter.
-        uint32_t cnt32 = htim_->Instance->CNT;
+        // TIM4 is 16-bit counter.
+        uint16_t cnt16 = static_cast<uint16_t>(htim_->Instance->CNT);
         // Modulo to counts_per_rev to get position within one revolution.
-        return static_cast<uint16_t>(cnt32 % counts_per_rev_);
+        // return static_cast<uint16_t>(cnt16 % counts_per_rev_);
+        return cnt16;
     }
 
     void reset() override
