@@ -9,6 +9,7 @@
 #include "stm32f7xx_hal.h"
 #include "stm32f7xx_hal_adc_ex.h"
 #include "tick.hpp"
+#include "usb_comm.hpp"
 
 extern "C"
 {
@@ -86,6 +87,10 @@ struct MainApp
 
         platform::calibrate_current_sense();
 
+        MX_USB_DEVICE_Init();
+        HAL_NVIC_SetPriority(OTG_FS_IRQn, 6, 0);
+        platform::g_usb_comm.init();
+
         // Initialize heartbeat
         hb.start(tick);
     }
@@ -93,8 +98,20 @@ struct MainApp
     // Run the main loop
     void loop()
     {
+        hal::DwtCycleCounter cycle_counter;
+        uint32_t last_usb = cycle_counter.now_cycles();
         while (true)
+        {
             hb.update(tick, led);
+
+            uint32_t now = cycle_counter.now_cycles();
+            if ((now - last_usb) >= (cycle_counter.cycles_per_second() / 5000)) // ~1 ms
+            {
+                last_usb = now;
+                // last_usb += cycle_counter.cycles_per_second() / 1000; // avoid drift
+                platform::g_usb_comm.update(platform::ui);
+            }
+        }
     }
 };
 } // namespace app

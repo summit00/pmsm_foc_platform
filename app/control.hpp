@@ -380,7 +380,6 @@ class Control
         mUi.ThetaEncoder_deg = mEncoderSensor.getTheta_rad() * radToDeg;
         mUi.ThetaOpenLoop_deg = mOpenLoopSensor.getTheta_rad() * radToDeg;
 
-        mUi.busVoltage_V = mUdcBus_V;
         mUi.Id_A = mId_A;
         mUi.Iq_A = mIq_A;
         mUi.IdRef_A = mIdRef_A;
@@ -390,7 +389,7 @@ class Control
 
     void updateTelemetry()
     {
-        if (++mTelemetryCounter_count >= 50)
+        if (++mTelemetryCounter_count >= 2)
         {
             mTelemetryCounter_count = 0;
             writeUserTelemetry();

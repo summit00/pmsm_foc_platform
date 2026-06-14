@@ -9,6 +9,12 @@ extern "C"
 {
     extern ADC_HandleTypeDef hadc1;
     extern ADC_HandleTypeDef hadc2;
+    extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
+}
+
+extern "C" void OTG_FS_IRQHandler(void)
+{
+    HAL_PCD_IRQHandler(&hpcd_USB_OTG_FS);
 }
 
 extern "C" void SysTick_Handler(void)
