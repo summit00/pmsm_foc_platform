@@ -105,7 +105,7 @@ struct MainApp
             hb.update(tick, led);
 
             uint32_t now = cycle_counter.now_cycles();
-            if ((now - last_usb) >= (cycle_counter.cycles_per_second() / 5000)) // ~1 ms
+            if ((now - last_usb) >= (cycle_counter.cycles_per_second() / 1000)) // ~1 ms
             {
                 last_usb = now;
                 // last_usb += cycle_counter.cycles_per_second() / 1000; // avoid drift

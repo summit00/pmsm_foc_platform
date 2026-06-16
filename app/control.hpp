@@ -385,15 +385,12 @@ class Control
         mUi.IdRef_A = mIdRef_A;
         mUi.IqRef_A = mIqRef_A;
         mUi.Udc_V = mUdcBus_V;
+        mUi.busVoltage_V = mUdcBus_V;
     }
 
     void updateTelemetry()
     {
-        if (++mTelemetryCounter_count >= 2)
-        {
-            mTelemetryCounter_count = 0;
-            writeUserTelemetry();
-        }
+        writeUserTelemetry();
     }
 
     IADC& mAdcSense;

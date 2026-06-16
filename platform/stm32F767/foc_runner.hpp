@@ -7,6 +7,7 @@
 #include "gate_driver_enable.hpp"
 #include "inverter.hpp"
 #include "motor_params.hpp"
+#include "usb_comm.hpp"
 
 extern "C"
 {
@@ -43,6 +44,20 @@ inline app::Control control{
 inline void motor_control_isr()
 {
     control.run_isr();
+
+    TelemetrySample sample;
+    sample.actualSpeed_rpm = static_cast<int16_t>(ui.actualSpeed_rpm * 100.0f);
+    sample.busVoltage_V = static_cast<int16_t>(ui.busVoltage_V * 100.0f);
+    sample.Id_A = static_cast<int16_t>(ui.Id_A * 1000.0f);
+    sample.Iq_A = static_cast<int16_t>(ui.Iq_A * 1000.0f);
+    sample.IdRef_A = static_cast<int16_t>(ui.IdRef_A * 1000.0f);
+    sample.IqRef_A = static_cast<int16_t>(ui.IqRef_A * 1000.0f);
+    sample.ThetaEncoder_deg = static_cast<int16_t>(ui.ThetaEncoder_deg * 100.0f);
+    sample.ThetaOpenLoop_deg = static_cast<int16_t>(ui.ThetaOpenLoop_deg * 100.0f);
+    sample.actualSpeedEncoder_rpm = static_cast<int16_t>(ui.actualSpeedEncoder_rpm * 100.0f);
+    sample.Udc_V = static_cast<int16_t>(ui.Udc_V * 100.0f);
+
+    g_usb_comm.push_sample(sample);
 }
 
 inline void calibrate_current_sense()

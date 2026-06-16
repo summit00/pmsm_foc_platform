@@ -49,7 +49,67 @@ namespace platform
 static constexpr uint16_t USB_RX_MAGIC = 0xABCDu;
 static constexpr uint16_t USB_TX_MAGIC = 0xDCBAu;
 static constexpr uint16_t USB_PAYLOAD_N = 10u;
-static constexpr uint16_t USB_FRAME_BYTES = 4u + USB_PAYLOAD_N * 4u; // 44
+static constexpr uint16_t USB_FRAME_BYTES = 4u + USB_PAYLOAD_N * 4u; // 44 for RX commands
+
+// 16-bit packed telemetry sample for efficient bandwidth utilization
+struct __attribute__((packed)) TelemetrySample
+{
+    int16_t actualSpeed_rpm;         // x 100
+    int16_t busVoltage_V;           // x 100
+    int16_t Id_A;                    // x 1000
+    int16_t Iq_A;                    // x 1000
+    int16_t IdRef_A;                 // x 1000
+    int16_t IqRef_A;                 // x 1000
+    int16_t ThetaEncoder_deg;       // x 100
+    int16_t ThetaOpenLoop_deg;      // x 100
+    int16_t actualSpeedEncoder_rpm;  // x 100
+    int16_t Udc_V;                  // x 100
+};
+
+// Lock-free single-producer, single-consumer ring buffer
+template <typename T, size_t Size>
+class RingBuffer
+{
+  public:
+    bool push(const T& item)
+    {
+        size_t next = (head_ + 1) % Size;
+        if (next == tail_)
+        {
+            return false; // Overflow
+        }
+        data_[head_] = item;
+        head_ = next;
+        return true;
+    }
+
+    bool pop(T& item)
+    {
+        if (head_ == tail_)
+        {
+            return false; // Underflow
+        }
+        item = data_[tail_];
+        tail_ = (tail_ + 1) % Size;
+        return true;
+    }
+
+    size_t size() const
+    {
+        size_t h = head_;
+        size_t t = tail_;
+        if (h >= t)
+        {
+            return h - t;
+        }
+        return Size + h - t;
+    }
+
+  private:
+    volatile size_t head_ = 0;
+    volatile size_t tail_ = 0;
+    T data_[Size];
+};
 
 // External symbols from usbd_cdc_if.c — not modified, just referenced.
 extern "C" uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
@@ -68,31 +128,33 @@ class UsbComm
 
     // Call from the main loop at ~1 ms.
     // 1. Poll for a newly received RX frame → apply commands to ui.
-    // 2. Snapshot telemetry from ui → transmit TX frame.
+    // 2. Snapshot telemetry from ring buffer → transmit TX frame.
     void update(app::UserInterface& ui)
     {
         poll_rx(ui);
         send_telemetry(ui);
     }
 
+    // Call from ISR to push a sample to the queue
+    void push_sample(const TelemetrySample& sample)
+    {
+        tx_queue_.push(sample);
+    }
+
   private:
     uint16_t tx_seq_ = 0;
     uint16_t last_rx_seq_ = 0;
-    uint8_t tx_buf_[USB_FRAME_BYTES] = {};
+
+    static constexpr size_t MAX_BATCH_SAMPLES = 24;
+    static constexpr size_t TX_BATCH_HEADER_BYTES = 6;
+    static constexpr size_t TX_BUFFER_BYTES = TX_BATCH_HEADER_BYTES + MAX_BATCH_SAMPLES * sizeof(TelemetrySample);
+    
+    uint8_t tx_buf_[TX_BUFFER_BYTES] = {};
+    RingBuffer<TelemetrySample, 512> tx_queue_;
 
     // -----------------------------------------------------------------------
     // RX — the USB CDC stack writes received bytes directly into UserRxBufferFS
     // and calls CDC_Receive_FS (static in usbd_cdc_if.c, not patchable).
-    // Instead, we reach into the CDC class handle to check whether a new
-    // OUT transfer completed since the last poll.
-    //
-    // USBD_CDC_HandleTypeDef::RxLength is set by the stack just before calling
-    // CDC_Receive_FS; CDC_Receive_FS re-arms the RX endpoint and returns.
-    // We detect a new frame by comparing the cached sequence field in the
-    // frame header — if it changed, we have fresh data.
-    //
-    // This is main-loop only (no IRQ), so UserRxBufferFS access is safe as
-    // long as we treat it as volatile (USB IRQ may be writing concurrently).
     void poll_rx(app::UserInterface& ui)
     {
         if (hUsbDeviceFS.pClassData == nullptr)
@@ -100,10 +162,6 @@ class UsbComm
 
         auto* hcdc = static_cast<USBD_CDC_HandleTypeDef*>(hUsbDeviceFS.pClassData);
 
-        // The USB OUT transfer has completed when RxLength > 0 and the endpoint
-        // is re-armed (RxState == 0 after CDC_Receive_FS re-called SetRxBuffer).
-        // We use the frame sequence number as the change detector instead of a
-        // state flag, because CDC_Receive_FS itself resets the endpoint.
         uint16_t rx_len = static_cast<uint16_t>(hcdc->RxLength);
         if (rx_len < USB_FRAME_BYTES)
             return;
@@ -133,9 +191,6 @@ class UsbComm
         memcpy(p, &local[4], USB_PAYLOAD_N * sizeof(int32_t));
 
         // Apply commands — written from main loop, read by ADC IRQ.
-        // __disable_irq guard keeps the struct update atomic enough:
-        // the ADC ISR reads these at most every 50 µs; a struct copy here
-        // takes ~10 cycles, well within one instruction window.
         __disable_irq();
         ui.mEnable = static_cast<uint8_t>(p[0] != 0 ? 1u : 0u);
         ui.mMode = static_cast<uint8_t>(p[1] & 0xFFu);
@@ -147,36 +202,54 @@ class UsbComm
 
     // -----------------------------------------------------------------------
     // TX — snapshot telemetry and send a binary frame.
-    // CDC_Transmit_FS is non-blocking; returns USBD_BUSY if the previous IN
-    // transfer is still in flight — we silently skip that tick (~1 ms later).
     void send_telemetry(const app::UserInterface& ui)
     {
-        // Snapshot atomically: ADC IRQ writes the telemetry fields at 20 kHz.
-        // A brief __disable_irq prevents reading a half-written float.
-        app::UserInterface snap;
-        __disable_irq();
-        snap = ui;
-        __enable_irq();
+        (void)ui;
 
-        int32_t p[USB_PAYLOAD_N];
-        p[0] = static_cast<int32_t>(snap.actualSpeed_rpm);
-        p[1] = static_cast<int32_t>(snap.Udc_V * 1000.0f);
-        p[2] = static_cast<int32_t>(snap.Id_A * 1000.0f);
-        p[3] = static_cast<int32_t>(snap.Iq_A * 1000.0f);
-        p[4] = static_cast<int32_t>(snap.IdRef_A * 1000.0f);
-        p[5] = static_cast<int32_t>(snap.IqRef_A * 1000.0f);
-        p[6] = static_cast<int32_t>(snap.ThetaEncoder_deg * 100.0f);
-        p[7] = static_cast<int32_t>(snap.ThetaOpenLoop_deg * 100.0f);
-        p[8] = static_cast<int32_t>(5.0f * 100.0f);
-        p[9] = static_cast<int32_t>(1.0f * 1000.0f);
+        if (hUsbDeviceFS.pClassData == nullptr)
+            return;
 
+        auto* hcdc = static_cast<USBD_CDC_HandleTypeDef*>(hUsbDeviceFS.pClassData);
+        if (hcdc->TxState != 0)
+        {
+            return; // USB is busy transmitting the previous batch, try next frame
+        }
+
+        size_t avail = tx_queue_.size();
+        if (avail == 0)
+        {
+            return;
+        }
+
+        size_t count = avail;
+        if (count > MAX_BATCH_SAMPLES)
+        {
+            count = MAX_BATCH_SAMPLES;
+        }
+
+        // Fill header
         uint16_t magic = USB_TX_MAGIC;
+        uint16_t count_u16 = static_cast<uint16_t>(count);
         memcpy(&tx_buf_[0], &magic, 2);
         memcpy(&tx_buf_[2], &tx_seq_, 2);
-        memcpy(&tx_buf_[4], p, USB_PAYLOAD_N * sizeof(int32_t));
+        memcpy(&tx_buf_[4], &count_u16, 2);
+
+        // Pop samples into buffer
+        uint8_t* ptr = &tx_buf_[TX_BATCH_HEADER_BYTES];
+        for (size_t i = 0; i < count; ++i)
+        {
+            TelemetrySample s;
+            if (tx_queue_.pop(s))
+            {
+                memcpy(ptr, &s, sizeof(TelemetrySample));
+                ptr += sizeof(TelemetrySample);
+            }
+        }
+
+        uint16_t total_bytes = static_cast<uint16_t>(TX_BATCH_HEADER_BYTES + count * sizeof(TelemetrySample));
         ++tx_seq_;
 
-        CDC_Transmit_FS(tx_buf_, USB_FRAME_BYTES);
+        CDC_Transmit_FS(tx_buf_, total_bytes);
     }
 };
 
