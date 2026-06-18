@@ -14,16 +14,19 @@ struct UserInterface
     float mIsAbs_mA = 0.0f;
 
     // Telemetry
-    float actualSpeed_rpm = 0.0f;
-    float busVoltage_V = 0.0f;
+    float Udc_V = 0.0f;
     float Id_A = 0.0f;
     float Iq_A = 0.0f;
+    float demandSpeed_rpm = 0.0f;
+    float openLoopSpeed_rpm = 0.0f;
+    float encoderSpeed_rpm = 0.0f;
+    float feedbackSpeed_rpm = 0.0f;
+    float observerSpeed_rpm = 0.0f;
     float IdRef_A = 0.0f;
     float IqRef_A = 0.0f;
-    float ThetaEncoder_deg = 0.0f;
-    float ThetaOpenLoop_deg = 0.0f;
-    float actualSpeedEncoder_rpm = 0.0f;
-    float Udc_V = 0.0f;
+    float encoderAngle_deg = 0.0f;
+    float observerAngle_deg = 0.0f;
+    float angleError_deg = 0.0f;
 };
 
 } // namespace app

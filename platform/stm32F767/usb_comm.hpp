@@ -54,21 +54,20 @@ static constexpr uint16_t USB_FRAME_BYTES = 4u + USB_PAYLOAD_N * 4u; // 44 for R
 // 16-bit packed telemetry sample for efficient bandwidth utilization
 struct __attribute__((packed)) TelemetrySample
 {
-    int16_t actualSpeed_rpm;         // x 100
-    int16_t busVoltage_V;           // x 100
-    int16_t Id_A;                    // x 1000
-    int16_t Iq_A;                    // x 1000
-    int16_t IdRef_A;                 // x 1000
-    int16_t IqRef_A;                 // x 1000
-    int16_t ThetaEncoder_deg;       // x 100
-    int16_t ThetaOpenLoop_deg;      // x 100
-    int16_t actualSpeedEncoder_rpm;  // x 100
-    int16_t Udc_V;                  // x 100
+    int16_t Udc_V;             // x 100
+    int16_t demandSpeed_rpm;   // x 1
+    int16_t feedbackSpeed_rpm; // x 1
+    int16_t encoderSpeed_rpm;  // x 1
+    int16_t observerSpeed_rpm; // x 1
+    int16_t Id_A;              // x 1000
+    int16_t Iq_A;              // x 1000
+    int16_t encoderAngle_deg;  // x 100
+    int16_t observerAngle_deg; // x 100
+    int16_t angleError_deg;    // x 100
 };
 
 // Lock-free single-producer, single-consumer ring buffer
-template <typename T, size_t Size>
-class RingBuffer
+template <typename T, size_t Size> class RingBuffer
 {
   public:
     bool push(const T& item)
@@ -147,8 +146,9 @@ class UsbComm
 
     static constexpr size_t MAX_BATCH_SAMPLES = 24;
     static constexpr size_t TX_BATCH_HEADER_BYTES = 6;
-    static constexpr size_t TX_BUFFER_BYTES = TX_BATCH_HEADER_BYTES + MAX_BATCH_SAMPLES * sizeof(TelemetrySample);
-    
+    static constexpr size_t TX_BUFFER_BYTES =
+        TX_BATCH_HEADER_BYTES + MAX_BATCH_SAMPLES * sizeof(TelemetrySample);
+
     uint8_t tx_buf_[TX_BUFFER_BYTES] = {};
     RingBuffer<TelemetrySample, 512> tx_queue_;
 
@@ -246,7 +246,8 @@ class UsbComm
             }
         }
 
-        uint16_t total_bytes = static_cast<uint16_t>(TX_BATCH_HEADER_BYTES + count * sizeof(TelemetrySample));
+        uint16_t total_bytes =
+            static_cast<uint16_t>(TX_BATCH_HEADER_BYTES + count * sizeof(TelemetrySample));
         ++tx_seq_;
 
         CDC_Transmit_FS(tx_buf_, total_bytes);
