@@ -57,7 +57,7 @@ class AutoSetup
         static constexpr float STOP_ACCEL_RAD_S2 = 1000.0f;
 
         static constexpr float LS_INJECTION_FREQ_HZ = 1000.0f;
-        static constexpr float ALIGN_SPEED_RAD_S = 300.0f;
+        static constexpr float ALIGN_SPEED_RAD_S = 800.0f;
         static constexpr float SETTLE_THRESHOLD_RAD_S = 0.1f;
     };
 
@@ -231,7 +231,7 @@ class AutoSetup
         if (++mTimer < Config::RS_SETTLE_TICKS)
             return false;
 
-        if (std::abs(Iq_A) > (mTargetCurrent_A * 0.05f))
+        if (std::abs(Iq_A) > (mTargetCurrent_A * 0.1f))
         {
             resetPhase();
             return false;

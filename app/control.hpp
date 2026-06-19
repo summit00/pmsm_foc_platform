@@ -244,7 +244,7 @@ class Control
                 break;
         }
 
-        if (!mAutoSetupRefs.BypassCurrentControl)
+        if (!bypassCurrentControl)
         {
             std::tie(mUd_V, mUq_V) = mFoc.runCurrentControl(mIdRef_A,
                                                             mIqRef_A,
@@ -253,9 +253,6 @@ class Control
                                                             activeOmega_rad_Hz,
                                                             mUsLimit_V,
                                                             mMotorEnabled_bool);
-
-            mUd_V += injectedUd_V;
-            mUq_V += injectedUq_V;
         }
         else
         {

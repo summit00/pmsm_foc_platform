@@ -32,7 +32,6 @@
       "preLaunchTask": "2. Build Project",
       "runToMain": false,
       "device": "STM32F767",
-      "svdFile": "${workspaceFolder}/STM32F767.svd",
       "interface": "swd",
       "liveWatch": {
         "enabled": true,
