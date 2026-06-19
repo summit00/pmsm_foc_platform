@@ -39,7 +39,7 @@ class Control
                      UserInterface& ui,
                      float pwmPeriod_s)
         : mAdcSense(adc_sense), mInverter(inverter), mGateEnable(gate_enable),
-          mMotorParams(motor_params), mFoc(motor_params, pwmPeriod_s), mUi(ui),
+          mMotorParams(motor_params), mUi(ui), mFoc(motor_params, pwmPeriod_s),
           mOpenLoopSensor(pwmPeriod_s, mOmegaRef_rad_Hz, mMotorEnabled_bool),
           mEncoderSensor(encoder,
                          pwmPeriod_s,
@@ -191,10 +191,6 @@ class Control
         float activeTheta_rad = mSensorSelector.getActiveTheta_rad();
         float activeOmega_rad_Hz = mSensorSelector.getActiveOmega_rad_Hz();
 
-        angleError = math::compute_angle_error(mOpenLoopSensor.getTheta_rad(),
-                                               mEncoderSensor.getTheta_rad()) *
-                     360.0f / math::TWO_PI;
-
         std::tie(mId_A, mIq_A) = mTransforms.park(mIalpha_A, mIbeta_A, activeTheta_rad);
 
         bool bypassCurrentControl = false;
@@ -248,7 +244,7 @@ class Control
                 break;
         }
 
-        if (!mAutoSetupRefs.BypassCurrentControl)
+        if (!bypassCurrentControl)
         {
             std::tie(mUd_V, mUq_V) = mFoc.runCurrentControl(mIdRef_A,
                                                             mIqRef_A,
@@ -257,9 +253,6 @@ class Control
                                                             activeOmega_rad_Hz,
                                                             mUsLimit_V,
                                                             mMotorEnabled_bool);
-
-            mUd_V += injectedUd_V;
-            mUq_V += injectedUq_V;
         }
         else
         {
@@ -290,14 +283,14 @@ class Control
         {
             mMotorEnabled_bool = mCmdMotorEnabled_bool;
             mGateEnable.set_enable(mMotorEnabled_bool);
+        }
 
-            if (!mMotorEnabled_bool)
-            {
-                mFoc.resetFoc();
-                mSensorSelector.updateAllSensors();
-                mAutoSetup.reset();
-                return;
-            }
+        if (!mMotorEnabled_bool)
+        {
+            mFoc.resetFoc();
+            mSensorSelector.updateAllSensors();
+            mAutoSetup.reset();
+            return;
         }
     }
 
@@ -368,28 +361,31 @@ class Control
         constexpr float radHzToRpm = 30.0f / std::numbers::pi_v<float>;
         constexpr float radToDeg = 180.0f / std::numbers::pi_v<float>;
 
-        mUi.actualSpeed_rpm =
+        mUi.demandSpeed_rpm = (mOmegaRef_rad_Hz * radHzToRpm) / mMotorParams.polePairs;
+        mUi.openLoopSpeed_rpm =
             (mOpenLoopSensor.getOmega_rad_Hz() * radHzToRpm) / mMotorParams.polePairs;
-        mUi.actualSpeedEncoder_rpm =
+        mUi.encoderSpeed_rpm =
             (mEncoderSensor.getOmega_rad_Hz() * radHzToRpm) / mMotorParams.polePairs;
+        mUi.feedbackSpeed_rpm =
+            (mSensorSelector.getActiveOmega_rad_Hz() * radHzToRpm) / mMotorParams.polePairs;
+        mUi.observerSpeed_rpm =
+            (mEmkObserver.getOmega_rad_Hz() * radHzToRpm) / mMotorParams.polePairs;
+        mUi.encoderAngle_deg = mEncoderSensor.getTheta_rad() * radToDeg;
+        mUi.observerAngle_deg = mEmkObserver.getTheta_rad() * radToDeg;
+        mUi.angleError_deg =
+            math::compute_angle_error(mEncoderSensor.getTheta_rad(), mEmkObserver.getTheta_rad()) *
+            radToDeg;
 
-        mUi.ThetaEncoder_deg = mEncoderSensor.getTheta_rad() * radToDeg;
-        mUi.ThetaOpenLoop_deg = mOpenLoopSensor.getTheta_rad() * radToDeg;
-
-        mUi.busVoltage_V = mUdcBus_V;
         mUi.Id_A = mId_A;
         mUi.Iq_A = mIq_A;
         mUi.IdRef_A = mIdRef_A;
         mUi.IqRef_A = mIqRef_A;
+        mUi.Udc_V = mUdcBus_V;
     }
 
     void updateTelemetry()
     {
-        if (++mTelemetryCounter_count >= 50)
-        {
-            mTelemetryCounter_count = 0;
-            writeUserTelemetry();
-        }
+        writeUserTelemetry();
     }
 
     IADC& mAdcSense;
@@ -440,8 +436,6 @@ class Control
     uint8_t mTelemetryCounter_count{0};
     uint32_t mSpeedLoopCounter_count{0};
     const uint32_t mSpeedLoopDivider_count{10};
-
-    float angleError{};
 };
 
 } // namespace app

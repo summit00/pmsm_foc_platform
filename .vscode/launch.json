@@ -9,14 +9,30 @@
       "cwd": "${workspaceFolder}",
       "executable": "${workspaceFolder}/build/platform/pmsm_foc_platform.elf",
       "gdbPath": "C:\\Arm\\13.3 rel1\\bin\\arm-none-eabi-gdb.exe",
-      "preLaunchTask": "cmake: build",
+      "preLaunchTask": "2. Build Project",
       "runToMain": false,
-      "preLaunchTask": "2. Build Project", 
       "device": "STM32G431",
-      "svdFile": "${workspaceFolder}/STM32G431.svd",
 
       "interface": "swd",
 
+      "liveWatch": {
+        "enabled": true,
+        "samplesPerSecond": 4
+      }
+    }
+    ,
+    {
+      "name": "Debug STM32F767",
+      "type": "cortex-debug",
+      "request": "launch",
+      "servertype": "stlink",
+      "cwd": "${workspaceFolder}",
+      "executable": "${workspaceFolder}/build/platform/pmsm_foc_platform.elf",
+      "gdbPath": "C:\\Arm\\13.3 rel1\\bin\\arm-none-eabi-gdb.exe",
+      "preLaunchTask": "2. Build Project",
+      "runToMain": false,
+      "device": "STM32F767",
+      "interface": "swd",
       "liveWatch": {
         "enabled": true,
         "samplesPerSecond": 4

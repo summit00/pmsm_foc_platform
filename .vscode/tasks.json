@@ -2,15 +2,15 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "1. Configure Project",
+      "label": "1. Setup Project",
       "type": "shell",
-      "command": "echo '${input:target}' > .target_config; if ('${input:target}' -eq 'stm32g431') { cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE='${workspaceFolder}/cmake/arm-none-eabi-toolchain.cmake' } else { cmake -S . -B build-host -G Ninja -DPLATFORM=host -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug }",
+      "command": "echo '${input:target}' > .target_config; if ('${input:target}' -eq 'nucleoG431_ihm07' -or '${input:target}' -eq 'nucleoF767_ihm07') { cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE='${workspaceFolder}/cmake/arm-none-eabi-toolchain.cmake' -DTARGET_BOARD='${input:target}' } else { cmake -S . -B build-host -G Ninja -DPLATFORM=host -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug }",
       "group": "build"
     },
     {
       "label": "2. Build Project",
       "type": "shell",
-      "command": "$target = Get-Content .target_config -ErrorAction SilentlyContinue; if (!$target) { Write-Error 'Please run Configure first!'; exit 1 }; if ($target -eq 'stm32g431') { cmake --build build } elseif ($target -eq 'SIL-Simulation') { cmake --build build-host --target system_test } else { cmake --build build-host --target unit_tests }",
+      "command": "$target = Get-Content .target_config -ErrorAction SilentlyContinue; if (!$target) { Write-Error 'Please run Setup Project first!'; exit 1 }; if ($target -eq 'nucleoG431_ihm07' -or $target -eq 'nucleoF767_ihm07') { cmake --build build } elseif ($target -eq 'SIL-Simulation') { cmake --build build-host --target system_test } else { cmake --build build-host --target unit_tests }",
       "group": {
         "kind": "build",
         "isDefault": true
@@ -23,7 +23,18 @@
       "dependsOn": [
         "2. Build Project"
       ],
-      "command": "$target = Get-Content .target_config -ErrorAction SilentlyContinue; if (!$target) { Write-Error 'Please run Configure first!'; exit 1 }; if ($target -eq 'stm32g431') { & 'C:\\Program Files\\STMicroelectronics\\STM32Cube\\STM32CubeProgrammer\\bin\\STM32_Programmer_CLI.exe' -c port=SWD -w '${workspaceFolder}\\build\\platform\\pmsm_foc_platform.elf' -v -rst } elseif ($target -eq 'SIL-Simulation') { & '${workspaceFolder}\\build-host\\tests\\sim\\system_test.exe' -s } else { & '${workspaceFolder}\\build-host\\tests\\unit_tests\\unit_tests.exe' }",
+      "command": "$target = Get-Content .target_config -ErrorAction SilentlyContinue; if (!$target) { Write-Error 'Please run Setup Project first!'; exit 1 }; if ($target -eq 'nucleoG431_ihm07') { & 'C:\\Program Files\\STMicroelectronics\\STM32Cube\\STM32CubeProgrammer\\bin\\STM32_Programmer_CLI.exe' -c port=SWD -w '${workspaceFolder}\\build\\platform\\pmsm_foc_platform.elf' -v -rst } elseif ($target -eq 'nucleoF767_ihm07') { & 'C:\\Program Files\\STMicroelectronics\\STM32Cube\\STM32CubeProgrammer\\bin\\STM32_Programmer_CLI.exe' -c port=SWD -w '${workspaceFolder}\\build\\platform\\pmsm_foc_platform.elf' -v -rst } elseif ($target -eq 'SIL-Simulation') { & '${workspaceFolder}\\build-host\\tests\\sim\\system_test.exe' -s } else { & '${workspaceFolder}\\build-host\\tests\\unit_tests\\unit_tests.exe' }",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+        {
+      "label": "3b. Erase Chip",
+      "type": "shell",
+      "command": "$target = Get-Content .target_config -ErrorAction SilentlyContinue; if (!$target) { Write-Error 'Please run Setup Project first!'; exit 1 }; if ($target -eq 'nucleoG431_ihm07' -or $target -eq 'nucleoF767_ihm07') { & 'C:\\Program Files\\STMicroelectronics\\STM32Cube\\STM32CubeProgrammer\\bin\\STM32_Programmer_CLI.exe' -c port=SWD -e all } else { Write-Host 'Target is a host simulation/test. Erase skipped.' }",
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -32,11 +43,11 @@
       }
     },
     {
-  "label": "4. Delete build Folders",
-  "type": "shell",
-  "command": "Stop-Process -Name 'system_test', 'unit_tests' -ErrorAction SilentlyContinue; @('build', 'build-host', '.target_config') | ForEach-Object { if (Test-Path $_) { Remove-Item -Recurse -Force $_ -ErrorAction SilentlyContinue } }",
-  "problemMatcher": []
-},
+      "label": "4. Delete build Folders",
+      "type": "shell",
+      "command": "Stop-Process -Name 'system_test', 'unit_tests' -ErrorAction SilentlyContinue; @('build', 'build-host', '.target_config') | ForEach-Object { if (Test-Path $_) { Remove-Item -Recurse -Force $_ -ErrorAction SilentlyContinue } }",
+      "problemMatcher": []
+    }
   ],
   "inputs": [
     {
@@ -44,11 +55,12 @@
       "type": "pickString",
       "description": "Select Target Platform",
       "options": [
-        "stm32g431",
+        "nucleoG431_ihm07",
+        "nucleoF767_ihm07",
         "SIL-Simulation",
         "Unit-Tests"
       ],
-      "default": "stm32g431"
+      "default": "nucleoG431_ihm07"
     }
   ]
 }
