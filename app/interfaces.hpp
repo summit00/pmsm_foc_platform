@@ -60,6 +60,7 @@ class IInverter
     virtual ~IInverter() = default;
     virtual void
     set_phase_voltages(float va_V, float vb_V, float vc_V, float vbus_V, bool isEnabled) = 0;
+    virtual float getMaxDuty() const = 0;
 };
 
 class IEnableOutput

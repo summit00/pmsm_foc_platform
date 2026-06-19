@@ -33,6 +33,11 @@ class Inverter : public app::IInverter
         __HAL_TIM_SET_COMPARE(htim, TIM_CHANNEL_3, static_cast<uint32_t>(duty_c * arr));
     }
 
+    float getMaxDuty() const override
+    {
+        return maxDuty;
+    }
+
   private:
     TIM_HandleTypeDef* htim;
     float minDuty = 0.0f;

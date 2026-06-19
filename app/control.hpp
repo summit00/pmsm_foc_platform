@@ -262,8 +262,9 @@ class Control
 
         std::tie(mUalpha_V, mUbeta_V) = mTransforms.inversePark(mUd_V, mUq_V, activeTheta_rad);
         auto [Va_V, Vb_V, Vc_V] = mTransforms.inverseClarke(mUalpha_V, mUbeta_V);
+        auto [Va_svm, Vb_svm, Vc_svm] = spaceVectorModulation(Va_V, Vb_V, Vc_V);
 
-        mInverter.set_phase_voltages(Va_V, Vb_V, Vc_V, mUdcBus_V, mMotorEnabled_bool);
+        mInverter.set_phase_voltages(Va_svm, Vb_svm, Vc_svm, mUdcBus_V, mMotorEnabled_bool);
 
         updateTelemetry();
     }
@@ -314,7 +315,7 @@ class Control
     {
         PhaseCurrents currents = mAdcSense.read_amps();
         mUdcBus_V = mAdcSense.read_bus_voltage();
-        mUsLimit_V = mUdcBus_V * math::INV_SQRT_3;
+        mUsLimit_V = mUdcBus_V * math::INV_SQRT_3 * mInverter.getMaxDuty();
         mTemp_C = mAdcSense.read_temperature_celsius();
 
         mFaultManager.checkForFaults(currents.ia_A, currents.ic_A, mUdcBus_V, mTemp_C);

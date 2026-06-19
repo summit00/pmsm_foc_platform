@@ -39,17 +39,34 @@ class FOC
                                                float Iq_A,
                                                float omega_rad_Hz,
                                                float UsLimit_V,
-                                               bool motor_enabled)
+                                               bool motor_enabled,
+                                               bool isDrivingClosedLoop = true)
     {
-        auto [Ud_ff, Uq_ff] = precontrol.compute(IdRef_A, IqRef_A, omega_rad_Hz);
+        auto [Udff_V, Uqff_V] = precontrol.compute(IdRef_A, IqRef_A, omega_rad_Hz, UsLimit_V);
 
-        auto Ud_pi_V = pi_d.compute(IdRef_A, Id_A, -UsLimit_V, UsLimit_V);
-        auto Uq_pi_V = pi_q.compute(IqRef_A, Iq_A, -UsLimit_V, UsLimit_V);
+        float Ud = 0.0f;
+        float Uq = 0.0f;
 
-        float Ud = std::clamp(Ud_pi_V + Ud_ff, -UsLimit_V, UsLimit_V);
-        float Uq = std::clamp(Uq_pi_V + Uq_ff, -UsLimit_V, UsLimit_V);
+        if (isDrivingClosedLoop)
+        {
+            const float UdMax_V = 0.95f * UsLimit_V;
+            Ud = pi_d.compute(IdRef_A, Id_A, Udff_V, -UdMax_V, UdMax_V);
 
-        std::tie(Ud, Uq) = DQLimiter::applyLimit(Ud, Uq, UsLimit_V);
+            const float UqMax_V = std::sqrt(std::max(0.0f, UsLimit_V * UsLimit_V - Ud * Ud));
+            Uq = pi_q.compute(IqRef_A, Iq_A, Uqff_V, -UqMax_V, UqMax_V);
+        }
+        else
+        {
+            Ud = pi_d.compute(IdRef_A, Id_A, Udff_V, -UsLimit_V, UsLimit_V);
+            Uq = pi_q.compute(IqRef_A, Iq_A, Uqff_V, -UsLimit_V, UsLimit_V);
+
+            const float Us_V = std::sqrt(Ud * Ud + Uq * Uq);
+            if (Us_V > UsLimit_V)
+            {
+                Ud = Ud * UsLimit_V / Us_V;
+                Uq = Uq * UsLimit_V / Us_V;
+            }
+        }
 
         if (!motor_enabled)
         {

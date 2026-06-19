@@ -9,12 +9,17 @@ class PIController
 
     float compute(float setpoint, float measured, float min, float max)
     {
+        return compute(setpoint, measured, 0.0f, min, max);
+    }
+
+    float compute(float setpoint, float measured, float feedforward, float min, float max)
+    {
         float error = setpoint - measured;
         float prop = mKp * error;
 
         mIntegral = std::clamp(mIntegral + mKi * prop, min, max);
 
-        return std::clamp(prop + mIntegral, min, max);
+        return std::clamp(prop + mIntegral + feedforward, min, max);
     }
 
     void setGains(float kp, float ki)
