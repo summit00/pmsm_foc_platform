@@ -197,6 +197,7 @@ class UsbComm
         ui.targetSpeed_rpm = static_cast<float>(p[2]) * 0.01f;
         ui.mAcceleration_rpm_s = static_cast<float>(p[3]) * 0.01f;
         ui.mIsAbs_mA = static_cast<float>(p[4]) * 0.1f;
+        ui.mSineAmplitude = static_cast<float>(p[5]) * 0.001f;
         __enable_irq();
     }
 

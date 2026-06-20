@@ -2,6 +2,7 @@
 
 #include "QEI_sensor.hpp"
 #include "auto_setup.hpp"
+#include "bode_sweeper.hpp"
 #include "emk_observer.hpp"
 #include "fault_manager.hpp"
 #include "foc.hpp"
@@ -29,7 +30,13 @@ class Control
         OPENLOOP = 0,
         CLOSEDLOOP = 1,
         AUTOSETUP = 2,
+        BODE_SWEEP = 3,
     };
+
+    const BodeSweeper& getBodeSweeper() const
+    {
+        return mBodeSweeper;
+    }
 
     explicit Control(IADC& adc_sense,
                      IInverter& inverter,
@@ -48,7 +55,7 @@ class Control
                          motor_params.encoderOffset_ticks),
           mEmkObserver(pwmPeriod_s, motor_params),
           mSensorSelector(mOpenLoopSensor, mEncoderSensor, mEmkObserver), mFaultManager(),
-          mSpeedRamp(pwmPeriod_s), mAutoSetup(mMotorParams, pwmPeriod_s)
+          mSpeedRamp(pwmPeriod_s), mAutoSetup(mMotorParams, pwmPeriod_s), mBodeSweeper(pwmPeriod_s)
     {
         mUdcBus_V = mAdcSense.read_bus_voltage();
         mTemp_C = mAdcSense.read_temperature_celsius();
@@ -242,17 +249,58 @@ class Control
                     }
                 }
                 break;
+
+            case Mode::BODE_SWEEP:
+                if (mMotorEnabled_bool)
+                {
+                    if (mBodeSweeper.getState() == BodeSweeper::State::IDLE)
+                    {
+                        // Define frequencies to sweep logarithmically from 10Hz to 2000Hz
+                        static constexpr float sweepFreqs[] = {
+                            10.0f,  12.0f,   14.0f,   17.0f,   21.0f,   25.0f,  30.0f,  36.0f,
+                            43.0f,  52.0f,   63.0f,   76.0f,   91.0f,   110.0f, 132.0f, 159.0f,
+                            192.0f, 231.0f,  278.0f,  335.0f,  404.0f,  487.0f, 586.0f, 706.0f,
+                            851.0f, 1025.0f, 1235.0f, 1488.0f, 1793.0f, 2000.0f};
+                        mBodeSweeper.configure(sweepFreqs,
+                                               sizeof(sweepFreqs) / sizeof(sweepFreqs[0]),
+                                               mUi.mSineAmplitude); // 0.2V amplitude
+                        mBodeSweeper.start();
+                    }
+
+                    // We sweep plant response: input is Uq, output is measured Iq
+                    float perturbation = mBodeSweeper.step(mUq_V, mIq_A);
+                    mBodeSweeperPerturbation = perturbation;
+                    mIdRef_A = 0.0f;
+                    mIqRef_A = 0.0f; // regulate base current around 0.0A
+                }
+                else
+                {
+                    mBodeSweeper.reset();
+                    mBodeSweeperPerturbation = 0.0f;
+                    mIdRef_A = 0.0f;
+                    mIqRef_A = 0.0f;
+                }
+                break;
         }
 
         if (!bypassCurrentControl)
         {
+            float Udinj_V = 0.0f;
+            float Uqinj_V = 0.0f;
+            if (mMode == Mode::BODE_SWEEP)
+            {
+                Uqinj_V = mBodeSweeperPerturbation;
+            }
             std::tie(mUd_V, mUq_V) = mFoc.runCurrentControl(mIdRef_A,
                                                             mIqRef_A,
                                                             mId_A,
                                                             mIq_A,
                                                             activeOmega_rad_Hz,
                                                             mUsLimit_V,
-                                                            mMotorEnabled_bool);
+                                                            mMotorEnabled_bool,
+                                                            true,
+                                                            Udinj_V,
+                                                            Uqinj_V);
         }
         else
         {
@@ -342,12 +390,14 @@ class Control
             {
                 mSensorSelector.selectSensor(SensorSelector::SensorType::OpenLoop);
             }
-            else if (mMode == Mode::CLOSEDLOOP)
+            else if (mMode == Mode::CLOSEDLOOP or mMode == Mode::BODE_SWEEP)
             {
                 mSensorSelector.selectSensor(SensorSelector::SensorType::Encoder);
             }
 
             mAutoSetup.reset();
+            mBodeSweeper.reset();
+            mBodeSweeperPerturbation = 0.0f;
         }
 
         mTargetOmega_rad_Hz =
@@ -407,6 +457,8 @@ class Control
     FaultManager mFaultManager;
     RampGenerator mSpeedRamp;
     AutoSetup mAutoSetup;
+    BodeSweeper mBodeSweeper;
+    float mBodeSweeperPerturbation{0.0f};
 
     // Control Variables
     float mTargetOmega_rad_Hz{0.0f};

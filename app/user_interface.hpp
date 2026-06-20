@@ -12,6 +12,7 @@ struct UserInterface
     float targetSpeed_rpm = 0.0f;
     float mAcceleration_rpm_s = 500.0f;
     float mIsAbs_mA = 0.0f;
+    float mSineAmplitude = 0.0f;
 
     // Telemetry
     float Udc_V = 0.0f;
