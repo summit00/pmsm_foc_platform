@@ -1,4 +1,5 @@
 #pragma once
+#include "math.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -68,7 +69,7 @@ class BodeSweeper
         }
 
         // Generate perturbation using current theta
-        float perturbation = mAmplitude * std::sin(mTheta);
+        float perturbation = mAmplitude * math::sin(mTheta);
 
         // State Machine & Correlation (uses the current theta that generated the perturbation)
         if (mState == State::SETTLING)
@@ -82,8 +83,8 @@ class BodeSweeper
         }
         else if (mState == State::MEASURING)
         {
-            float sinTheta = std::sin(mTheta);
-            float cosTheta = std::cos(mTheta);
+            float sinTheta = math::sin(mTheta);
+            float cosTheta = math::cos(mTheta);
 
             // Correlate input and output with sine/cos at the excitation frequency
             mInSinSum += inputSignal * sinTheta;
@@ -94,10 +95,10 @@ class BodeSweeper
             if (++mTickCounter >= mMeasureTicks)
             {
                 // Compute transfer function G = Output / Input
-                float inMagSq = mInSinSum * mInSinSum + mInCosSum * mInCosSum;
+                float inMagSq = math::square(mInSinSum) + math::square(mInCosSum);
                 if (inMagSq > 1e-12f)
                 {
-                    float outMag = std::sqrt(mOutSinSum * mOutSinSum + mOutCosSum * mOutCosSum);
+                    float outMag = std::sqrt(math::square(mOutSinSum) + math::square(mOutCosSum));
                     float inMag = std::sqrt(inMagSq);
                     float magnitude = outMag / inMag;
 
@@ -106,12 +107,12 @@ class BodeSweeper
                     float phaseDiff = phaseOut - phaseIn;
 
                     // Wrap to [-pi, pi]
-                    while (phaseDiff > std::numbers::pi_v<float>)
-                        phaseDiff -= 2.0f * std::numbers::pi_v<float>;
-                    while (phaseDiff < -std::numbers::pi_v<float>)
-                        phaseDiff += 2.0f * std::numbers::pi_v<float>;
+                    while (phaseDiff > math::PI)
+                        phaseDiff -= math::TWO_PI;
+                    while (phaseDiff < -math::PI)
+                        phaseDiff += math::TWO_PI;
 
-                    float phaseDeg = phaseDiff * (180.0f / std::numbers::pi_v<float>);
+                    float phaseDeg = phaseDiff * (180.0f / math::PI);
 
                     mMagnitudes[mCurrentFreqIdx] = magnitude;
                     mPhases[mCurrentFreqIdx] = phaseDeg;
@@ -141,10 +142,10 @@ class BodeSweeper
         if (mState != State::DONE)
         {
             float freq = mSweepFrequencies[mCurrentFreqIdx];
-            mTheta += 2.0f * std::numbers::pi_v<float> * freq * mCtrlPeriod_s;
-            if (mTheta >= 2.0f * std::numbers::pi_v<float>)
+            mTheta += math::TWO_PI * freq * mCtrlPeriod_s;
+            if (mTheta >= math::TWO_PI)
             {
-                mTheta -= 2.0f * std::numbers::pi_v<float>;
+                mTheta -= math::TWO_PI;
             }
         }
 
