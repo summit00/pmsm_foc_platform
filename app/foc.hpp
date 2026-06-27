@@ -40,13 +40,9 @@ class FOC
                                                float omega_rad_Hz,
                                                float UsLimit_V,
                                                bool motor_enabled,
-                                               bool isDrivingClosedLoop = true,
-                                               float Udinj_V = 0.0f,
-                                               float Uqinj_V = 0.0f)
+                                               bool isDrivingClosedLoop = true)
     {
         auto [Udff_V, Uqff_V] = precontrol.compute(IdRef_A, IqRef_A, omega_rad_Hz, UsLimit_V);
-        Udff_V += Udinj_V;
-        Uqff_V += Uqinj_V;
 
         float Ud = 0.0f;
         float Uq = 0.0f;

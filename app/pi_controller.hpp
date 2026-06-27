@@ -17,7 +17,7 @@ class PIController
         float error = setpoint - measured;
         float prop = mKp * error;
 
-        mIntegral = std::clamp(mIntegral + mKi * prop, min, max);
+        mIntegral = std::clamp(mIntegral + mKi * error, min, max);
 
         return std::clamp(prop + mIntegral + feedforward, min, max);
     }
@@ -55,8 +55,13 @@ class PIController
 
     std::array<float, 2> calculatePIGains(float R, float L, float Ts)
     {
-        float Kp = L / (2.0f * Ts);
-        float Ki = (R * Ts) / L;
+        float targetBandwidth_Hz = 700.0f;
+
+        float omega_c = math::TWO_PI * targetBandwidth_Hz;
+
+        // Parallel tuning formula.
+        float Kp = omega_c * L;
+        float Ki = omega_c * R * Ts;
 
         return {Kp, Ki};
     }
