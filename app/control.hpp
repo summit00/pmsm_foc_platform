@@ -54,8 +54,9 @@ class Control
                          static_cast<float>(motor_params.encoderTicks),
                          motor_params.encoderOffset_ticks),
           mEmkObserver(pwmPeriod_s, motor_params),
-          mSensorSelector(mOpenLoopSensor, mEncoderSensor, mEmkObserver), mFaultManager(),
-          mSpeedRamp(pwmPeriod_s), mAutoSetup(mMotorParams, pwmPeriod_s), mBodeSweeper(pwmPeriod_s)
+          mSensorSelector(mOpenLoopSensor, mEncoderSensor, mEmkObserver, pwmPeriod_s),
+          mFaultManager(), mSpeedRamp(pwmPeriod_s), mAutoSetup(mMotorParams, pwmPeriod_s),
+          mBodeSweeper(pwmPeriod_s)
     {
         mUdcBus_V = mAdcSense.read_bus_voltage();
         mTemp_C = mAdcSense.read_temperature_celsius();
@@ -196,6 +197,7 @@ class Control
 
         mSensorSelector.updateAllSensors();
         float activeTheta_rad = mSensorSelector.getActiveTheta_rad();
+        float activeThetaPredicted_rad = mSensorSelector.getActiveThetaPredicted_rad();
         float activeOmega_rad_Hz = mSensorSelector.getActiveOmega_rad_Hz();
 
         std::tie(mId_A, mIq_A) = mTransforms.park(mIalpha_A, mIbeta_A, activeTheta_rad);
@@ -301,7 +303,8 @@ class Control
             mUq_V = injectedUq_V;
         }
 
-        std::tie(mUalpha_V, mUbeta_V) = mTransforms.inversePark(mUd_V, mUq_V, activeTheta_rad);
+        std::tie(mUalpha_V, mUbeta_V) =
+            mTransforms.inversePark(mUd_V, mUq_V, activeThetaPredicted_rad);
         auto [Va_V, Vb_V, Vc_V] = mTransforms.inverseClarke(mUalpha_V, mUbeta_V);
         auto [Va_svm, Vb_svm, Vc_svm] = spaceVectorModulation(Va_V, Vb_V, Vc_V);
 
