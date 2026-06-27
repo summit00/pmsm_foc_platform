@@ -267,9 +267,6 @@ class Control
                         mBodeSweeper.start();
                     }
 
-                    // We sweep plant response: input is Uq, output is measured Iq
-                    float perturbation = mBodeSweeper.step(mUq_V, mIq_A);
-                    mBodeSweeperPerturbation = perturbation;
                     mIdRef_A = 0.0f;
                     mIqRef_A = 0.0f; // regulate base current around 0.0A
                 }
@@ -285,12 +282,6 @@ class Control
 
         if (!bypassCurrentControl)
         {
-            float Udinj_V = 0.0f;
-            float Uqinj_V = 0.0f;
-            if (mMode == Mode::BODE_SWEEP)
-            {
-                Uqinj_V = mBodeSweeperPerturbation;
-            }
             std::tie(mUd_V, mUq_V) = mFoc.runCurrentControl(mIdRef_A,
                                                             mIqRef_A,
                                                             mId_A,
@@ -298,9 +289,11 @@ class Control
                                                             activeOmega_rad_Hz,
                                                             mUsLimit_V,
                                                             mMotorEnabled_bool,
-                                                            true,
-                                                            Udinj_V,
-                                                            Uqinj_V);
+                                                            true);
+
+            float perturbation = mBodeSweeper.step(mUd_V, mId_A);
+            mBodeSweeperPerturbation = perturbation;
+            mUd_V += mBodeSweeperPerturbation;
         }
         else
         {

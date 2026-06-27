@@ -32,6 +32,8 @@ class BodeSweeper
             mSweepFrequencies[i] = frequencies[i];
             mMagnitudes[i] = 0.0f;
             mPhases[i] = 0.0f;
+            mClosedLoopMagnitudes[i] = 0.0f;
+            mClosedLoopPhases[i] = 0.0f;
         }
         mAmplitude = amplitude;
         reset();
@@ -59,19 +61,20 @@ class BodeSweeper
         prepareFrequencyStep();
     }
 
-    // Call this at the control loop rate (e.g. 20kHz for current loop, or 2kHz for speed loop)
-    // Returns the injection signal (perturbation) to add to the reference
-    float step(float inputSignal, float outputSignal)
+    float step(float u_pi, float measured)
     {
         if (mState == State::IDLE || mState == State::DONE)
         {
             return 0.0f;
         }
 
-        // Generate perturbation using current theta
         float perturbation = mAmplitude * math::sin(mTheta);
 
-        // State Machine & Correlation (uses the current theta that generated the perturbation)
+        // Core system parameter mapping
+        float inputSignal = u_pi + perturbation; // Total input to plant (u + Δu)
+        float outputSignal = measured;           // Measured response (y)
+
+        // State Machine execution logic
         if (mState == State::SETTLING)
         {
             if (++mTickCounter >= mSettleTicks)
@@ -86,44 +89,70 @@ class BodeSweeper
             float sinTheta = math::sin(mTheta);
             float cosTheta = math::cos(mTheta);
 
-            // Correlate input and output with sine/cos at the excitation frequency
+            // Integrate Fourier components over designated step cycle periods
             mInSinSum += inputSignal * sinTheta;
             mInCosSum += inputSignal * cosTheta;
             mOutSinSum += outputSignal * sinTheta;
             mOutCosSum += outputSignal * cosTheta;
 
+            // Isolate individual controller component path metrics
+            mControllerSinSum += u_pi * sinTheta;
+            mControllerCosSum += u_pi * cosTheta;
+
             if (++mTickCounter >= mMeasureTicks)
             {
-                // Compute transfer function G = Output / Input
-                float inMagSq = math::square(mInSinSum) + math::square(mInCosSum);
-                if (inMagSq > 1e-12f)
+                float plant_denom = math::square(mInSinSum) + math::square(mInCosSum);
+                float ctrl_denom = math::square(mOutSinSum) + math::square(mOutCosSum);
+
+                if (plant_denom > 1e-12f && ctrl_denom > 1e-12f)
                 {
-                    float outMag = std::sqrt(math::square(mOutSinSum) + math::square(mOutCosSum));
-                    float inMag = std::sqrt(inMagSq);
-                    float magnitude = outMag / inMag;
+                    // Complex Division: Plant P = Measured / U_total
+                    float P_real =
+                        ((mOutSinSum * mInSinSum) + (mOutCosSum * mInCosSum)) / plant_denom;
+                    float P_imag =
+                        ((mOutCosSum * mInSinSum) - (mOutSinSum * mInCosSum)) / plant_denom;
 
-                    float phaseIn = std::atan2(mInCosSum, mInSinSum);
-                    float phaseOut = std::atan2(mOutCosSum, mOutSinSum);
-                    float phaseDiff = phaseOut - phaseIn;
+                    // Complex Division: Controller C = - (U_pi / Measured)
+                    float C_real =
+                        -((mControllerSinSum * mOutSinSum) + (mControllerCosSum * mOutCosSum)) /
+                        ctrl_denom;
+                    float C_imag =
+                        -((mControllerCosSum * mOutSinSum) - (mControllerSinSum * mOutCosSum)) /
+                        ctrl_denom;
 
-                    // Wrap to [-pi, pi]
-                    while (phaseDiff > math::PI)
-                        phaseDiff -= math::TWO_PI;
-                    while (phaseDiff < -math::PI)
-                        phaseDiff += math::TWO_PI;
+                    // Compute Combined Open Loop system response: G_open = C * P
+                    float openLoop_real = (C_real * P_real) - (C_imag * P_imag);
+                    float openLoop_imag = (C_real * P_imag) + (C_imag * P_real);
 
-                    float phaseDeg = phaseDiff * (180.0f / math::PI);
+                    // Compute and assign Open Loop Polar values
+                    mMagnitudes[mCurrentFreqIdx] =
+                        std::sqrt(math::square(openLoop_real) + math::square(openLoop_imag));
+                    mPhases[mCurrentFreqIdx] =
+                        std::atan2(openLoop_imag, openLoop_real) * (180.0f / math::PI);
 
-                    mMagnitudes[mCurrentFreqIdx] = magnitude;
-                    mPhases[mCurrentFreqIdx] = phaseDeg;
+                    // Compute Closed Loop tracking profile: T = G_open / (1 + G_open)
+                    float cl_num_real = openLoop_real;
+                    float cl_num_imag = openLoop_imag;
+                    float cl_den_real = 1.0f + openLoop_real;
+                    float cl_den_imag = openLoop_imag;
+
+                    float cl_denom = math::square(cl_den_real) + math::square(cl_den_imag);
+
+                    if (cl_denom > 1e-12f)
+                    {
+                        float cl_real =
+                            ((cl_num_real * cl_den_real) + (cl_num_imag * cl_den_imag)) / cl_denom;
+                        float cl_imag =
+                            ((cl_num_imag * cl_den_real) - (cl_num_real * cl_den_imag)) / cl_denom;
+
+                        mClosedLoopMagnitudes[mCurrentFreqIdx] =
+                            std::sqrt(math::square(cl_real) + math::square(cl_imag));
+                        mClosedLoopPhases[mCurrentFreqIdx] =
+                            std::atan2(cl_imag, cl_real) * (180.0f / math::PI);
+                    }
                 }
-                else
-                {
-                    mMagnitudes[mCurrentFreqIdx] = 0.0f;
-                    mPhases[mCurrentFreqIdx] = 0.0f;
-                }
 
-                // Advance to next frequency
+                // Advance frequency pointer
                 mCurrentFreqIdx++;
                 if (mCurrentFreqIdx >= mNumPoints)
                 {
@@ -138,7 +167,7 @@ class BodeSweeper
             }
         }
 
-        // Update phase angle for the NEXT step
+        // Advance phase angle accumulator for the next loop execution step
         if (mState != State::DONE)
         {
             float freq = mSweepFrequencies[mCurrentFreqIdx];
@@ -169,6 +198,14 @@ class BodeSweeper
     {
         return mPhases;
     }
+    const float* getClosedLoopMagnitudes() const
+    {
+        return mClosedLoopMagnitudes;
+    }
+    const float* getClosedLoopPhases() const
+    {
+        return mClosedLoopPhases;
+    }
     size_t getNumPoints() const
     {
         return mNumPoints;
@@ -197,28 +234,29 @@ class BodeSweeper
         mInCosSum = 0.0f;
         mOutSinSum = 0.0f;
         mOutCosSum = 0.0f;
+        mControllerSinSum = 0.0f;
+        mControllerCosSum = 0.0f;
     }
 
     float mCtrlPeriod_s;
     float mAmplitude{0.0f};
-
     State mState{State::IDLE};
     size_t mCurrentFreqIdx{0};
     float mTheta{0.0f};
     uint32_t mTickCounter{0};
     uint32_t mSettleTicks{0};
     uint32_t mMeasureTicks{0};
-
-    // Accumulators for correlation/DFT
     float mInSinSum{0.0f};
     float mInCosSum{0.0f};
     float mOutSinSum{0.0f};
     float mOutCosSum{0.0f};
-
-    // Result arrays (flat memory layout, no dynamic allocation)
+    float mControllerSinSum{0.0f};
+    float mControllerCosSum{0.0f};
     float mSweepFrequencies[MAX_POINTS] = {};
     float mMagnitudes[MAX_POINTS] = {};
     float mPhases[MAX_POINTS] = {};
+    float mClosedLoopMagnitudes[MAX_POINTS] = {};
+    float mClosedLoopPhases[MAX_POINTS] = {};
     size_t mNumPoints{0};
 };
 
