@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <cstring>
+#include "user_interface.hpp"
 
 extern "C"
 {
@@ -45,6 +46,8 @@ extern "C"
 namespace platform
 {
 
+extern ::app::UserInterface ui;
+
 struct RxCommand {
     int32_t enable;
     int32_t mode;
@@ -58,19 +61,29 @@ static constexpr uint16_t USB_TX_MAGIC = 0xDCBAu;
 static constexpr uint16_t USB_PAYLOAD_N = 10u;
 static constexpr uint16_t USB_FRAME_BYTES = 4u + USB_PAYLOAD_N * 4u; // 44 for RX commands
 
-// 16-bit packed telemetry sample for efficient bandwidth utilization
-struct __attribute__((packed)) TelemetrySample
-{
-    int16_t Udc_V;             // x 100
-    int16_t demandSpeed_rpm;   // x 1
-    int16_t feedbackSpeed_rpm; // x 1
-    int16_t encoderSpeed_rpm;  // x 1
-    int16_t observerSpeed_rpm; // x 1
-    int16_t Id_A;              // x 1000
-    int16_t Iq_A;              // x 1000
-    int16_t encoderAngle_deg;  // x 100
-    int16_t observerAngle_deg; // x 100
-    int16_t angleError_deg;    // x 100
+struct __attribute__((packed)) Sample {
+    uint8_t id;
+    int16_t value;
+};
+
+struct TelemetryRegistryEntry {
+    const char* name;
+    uint8_t id;
+    const float* value_ptr;
+    float scale;
+};
+
+static constexpr TelemetryRegistryEntry telemetry_registry[] = {
+    {"Udc_V",             1,  &ui.Udc_V,             100.0f},
+    {"demandSpeed_rpm",   2,  &ui.demandSpeed_rpm,   1.0f},
+    {"feedbackSpeed_rpm", 3,  &ui.feedbackSpeed_rpm, 1.0f},
+    {"encoderSpeed_rpm",  4,  &ui.encoderSpeed_rpm,  1.0f},
+    {"observerSpeed_rpm", 5,  &ui.observerSpeed_rpm, 1.0f},
+    {"Id_A",              6,  &ui.Id_A,              1000.0f},
+    {"Iq_A",              7,  &ui.Iq_A,              1000.0f},
+    {"encoderAngle_deg",  8,  &ui.encoderAngle_deg,  100.0f},
+    {"observerAngle_deg", 9,  &ui.observerAngle_deg, 100.0f},
+    {"angleError_deg",    10, &ui.angleError_deg,    100.0f}
 };
 
 // Lock-free single-producer, single-consumer ring buffer
@@ -145,7 +158,7 @@ class UsbComm
     }
 
     // Call from ISR to push a sample to the queue
-    void push_sample(const TelemetrySample& sample)
+    void push_sample(const Sample& sample)
     {
         tx_queue_.push(sample);
     }
@@ -154,13 +167,13 @@ class UsbComm
     uint16_t tx_seq_ = 0;
     uint16_t last_rx_seq_ = 0;
 
-    static constexpr size_t MAX_BATCH_SAMPLES = 24;
+    static constexpr size_t MAX_BATCH_SAMPLES = 240;
     static constexpr size_t TX_BATCH_HEADER_BYTES = 6;
     static constexpr size_t TX_BUFFER_BYTES =
-        TX_BATCH_HEADER_BYTES + MAX_BATCH_SAMPLES * sizeof(TelemetrySample);
+        TX_BATCH_HEADER_BYTES + MAX_BATCH_SAMPLES * sizeof(Sample);
 
     uint8_t tx_buf_[TX_BUFFER_BYTES] = {};
-    RingBuffer<TelemetrySample, 512> tx_queue_;
+    RingBuffer<Sample, 2048> tx_queue_;
 
     RxCallback rxCb_ = nullptr;
     void* rxCtx_ = nullptr;
@@ -247,16 +260,16 @@ class UsbComm
         uint8_t* ptr = &tx_buf_[TX_BATCH_HEADER_BYTES];
         for (size_t i = 0; i < count; ++i)
         {
-            TelemetrySample s;
+            Sample s;
             if (tx_queue_.pop(s))
             {
-                memcpy(ptr, &s, sizeof(TelemetrySample));
-                ptr += sizeof(TelemetrySample);
+                memcpy(ptr, &s, sizeof(Sample));
+                ptr += sizeof(Sample);
             }
         }
 
         uint16_t total_bytes =
-            static_cast<uint16_t>(TX_BATCH_HEADER_BYTES + count * sizeof(TelemetrySample));
+            static_cast<uint16_t>(TX_BATCH_HEADER_BYTES + count * sizeof(Sample));
         ++tx_seq_;
 
         CDC_Transmit_FS(tx_buf_, total_bytes);

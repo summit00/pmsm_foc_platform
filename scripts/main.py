@@ -17,7 +17,7 @@ import numpy as np
 # ── Protocol ──────────────────────────────────────────────────────────────────
 RX_MAGIC    = 0xABCD
 TX_MAGIC    = 0xDCBA
-SAMPLE_BYTES = 20
+SAMPLE_BYTES = 3
 PAYLOAD_N   = 10
 
 TX_SLOTS = [
@@ -71,6 +71,7 @@ class SerialReader(threading.Thread):
             self._ser = serial.Serial(self._port, self._baud, timeout=0.01)
             buf = b""
             magic_bytes = struct.pack("<H", TX_MAGIC)
+            current_state = [0] * 10
             
             while not self._stop_evt.is_set():
                 while True:
@@ -95,7 +96,7 @@ class SerialReader(threading.Thread):
                             break
                     
                     magic, seq, sample_count = struct.unpack_from("<HHH", buf, 0)
-                    if not (1 <= sample_count <= 24):
+                    if not (1 <= sample_count <= 240):
                         buf = buf[2:]
                         continue
                     
@@ -106,15 +107,19 @@ class SerialReader(threading.Thread):
                     batch_samples = []
                     for i in range(sample_count):
                         offset = 6 + i * SAMPLE_BYTES
-                        raw_sample = list(struct.unpack_from("<10h", buf, offset))
-                        batch_samples.append(raw_sample)
+                        sid, val = struct.unpack_from("<Bh", buf, offset)
+                        if 1 <= sid <= 10:
+                            current_state[sid - 1] = val
+                            if sid == 10:
+                                batch_samples.append(list(current_state))
                     
                     buf = buf[expected_len:]
                     
-                    with self._lock:
-                        self._samples_list.extend(batch_samples)
-                        self._frame_count += sample_count
-                        self._new_data_flag = True
+                    if batch_samples:
+                        with self._lock:
+                            self._samples_list.extend(batch_samples)
+                            self._frame_count += len(batch_samples)
+                            self._new_data_flag = True
                             
         except Exception as e:
             self.error = str(e)
