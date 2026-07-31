@@ -7,7 +7,7 @@
 #include "gate_driver_enable.hpp"
 #include "inverter.hpp"
 #include "motor_params.hpp"
-#include "usb_comm.hpp"
+#include "hal/usb_comm.hpp"
 
 extern "C"
 {

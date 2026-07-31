@@ -20,6 +20,7 @@ if(TARGET_BOARD STREQUAL "nucleoG431_ihm07")
   )
 elseif(TARGET_BOARD STREQUAL "nucleoF767_ihm07")
   target_include_directories(hal_impl INTERFACE
+    ${CMAKE_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/stm32f767
     ${CMAKE_SOURCE_DIR}/app
 

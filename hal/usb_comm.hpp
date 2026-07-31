@@ -1,5 +1,4 @@
 #pragma once
-#include "user_interface.hpp"
 #include <cstdint>
 #include <cstring>
 
@@ -45,6 +44,14 @@ extern "C"
 
 namespace platform
 {
+
+struct RxCommand {
+    int32_t enable;
+    int32_t mode;
+    float targetSpeed_rpm;
+    float accel_rpm_s;
+    float isAbs_mA;
+};
 
 static constexpr uint16_t USB_RX_MAGIC = 0xABCDu;
 static constexpr uint16_t USB_TX_MAGIC = 0xDCBAu;
@@ -118,6 +125,9 @@ extern "C" USBD_HandleTypeDef hUsbDeviceFS;
 class UsbComm
 {
   public:
+    using RxCallback = void(*)(const RxCommand&, void* ctx);
+    void setRxCallback(RxCallback cb, void* ctx) { rxCb_ = cb; rxCtx_ = ctx; }
+
     // Call once after MX_USB_DEVICE_Init().
     void init()
     {
@@ -126,12 +136,12 @@ class UsbComm
     }
 
     // Call from the main loop at ~1 ms.
-    // 1. Poll for a newly received RX frame → apply commands to ui.
+    // 1. Poll for a newly received RX frame → apply commands via callback.
     // 2. Snapshot telemetry from ring buffer → transmit TX frame.
-    void update(app::UserInterface& ui)
+    void update()
     {
-        poll_rx(ui);
-        send_telemetry(ui);
+        poll_rx();
+        send_telemetry();
     }
 
     // Call from ISR to push a sample to the queue
@@ -152,10 +162,13 @@ class UsbComm
     uint8_t tx_buf_[TX_BUFFER_BYTES] = {};
     RingBuffer<TelemetrySample, 512> tx_queue_;
 
+    RxCallback rxCb_ = nullptr;
+    void* rxCtx_ = nullptr;
+
     // -----------------------------------------------------------------------
     // RX — the USB CDC stack writes received bytes directly into UserRxBufferFS
     // and calls CDC_Receive_FS (static in usbd_cdc_if.c, not patchable).
-    void poll_rx(app::UserInterface& ui)
+    void poll_rx()
     {
         if (hUsbDeviceFS.pClassData == nullptr)
             return;
@@ -192,20 +205,16 @@ class UsbComm
 
         // Apply commands — written from main loop, read by ADC IRQ.
         __disable_irq();
-        ui.mEnable = static_cast<uint8_t>(p[0] != 0 ? 1u : 0u);
-        ui.mMode = static_cast<uint8_t>(p[1] & 0xFFu);
-        ui.targetSpeed_rpm = static_cast<float>(p[2]) * 0.01f;
-        ui.mAcceleration_rpm_s = static_cast<float>(p[3]) * 0.01f;
-        ui.mIsAbs_mA = static_cast<float>(p[4]) * 0.1f;
+        RxCommand cmd{p[0], p[1], static_cast<float>(p[2]) * 0.01f,
+                      static_cast<float>(p[3]) * 0.01f, static_cast<float>(p[4]) * 0.1f};
+        if (rxCb_) rxCb_(cmd, rxCtx_);
         __enable_irq();
     }
 
     // -----------------------------------------------------------------------
     // TX — snapshot telemetry and send a binary frame.
-    void send_telemetry(const app::UserInterface& ui)
+    void send_telemetry()
     {
-        (void)ui;
-
         if (hUsbDeviceFS.pClassData == nullptr)
             return;
 
