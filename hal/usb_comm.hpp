@@ -57,6 +57,7 @@ struct RxCommand {
 };
 
 static constexpr uint16_t USB_RX_MAGIC = 0xABCDu;
+static constexpr uint16_t USB_SELECT_MAGIC = 0xABCEu;
 static constexpr uint16_t USB_TX_MAGIC = 0xDCBAu;
 static constexpr uint16_t USB_PAYLOAD_N = 10u;
 static constexpr uint16_t USB_FRAME_BYTES = 4u + USB_PAYLOAD_N * 4u; // 44 for RX commands
@@ -141,11 +142,32 @@ class UsbComm
     using RxCallback = void(*)(const RxCommand&, void* ctx);
     void setRxCallback(RxCallback cb, void* ctx) { rxCb_ = cb; rxCtx_ = ctx; }
 
+    uint16_t selectedIds_[10] = {};
+
+    void setSelectedIds(const uint16_t* ids, size_t n)
+    {
+        __disable_irq();
+        size_t count = (n > 10) ? 10 : n;
+        for (size_t i = 0; i < count; ++i)
+        {
+            selectedIds_[i] = ids[i];
+        }
+        for (size_t i = count; i < 10; ++i)
+        {
+            selectedIds_[i] = 0;
+        }
+        __enable_irq();
+    }
+
     // Call once after MX_USB_DEVICE_Init().
     void init()
     {
         tx_seq_ = 0;
         last_rx_seq_ = 0xFFFFu; // force first frame to be accepted
+        for (size_t i = 0; i < 10; ++i)
+        {
+            selectedIds_[i] = telemetry_registry[i].id;
+        }
     }
 
     // Call from the main loop at ~1 ms.
@@ -202,7 +224,7 @@ class UsbComm
         // Validate magic.
         uint16_t magic;
         memcpy(&magic, &local[0], 2);
-        if (magic != USB_RX_MAGIC)
+        if (magic != USB_RX_MAGIC && magic != USB_SELECT_MAGIC)
             return;
 
         // Deduplicate by sequence number: skip frames we already processed.
@@ -212,16 +234,26 @@ class UsbComm
             return;
         last_rx_seq_ = seq;
 
-        // Parse payload (little-endian int32_t array).
-        int32_t p[USB_PAYLOAD_N];
-        memcpy(p, &local[4], USB_PAYLOAD_N * sizeof(int32_t));
+        if (magic == USB_RX_MAGIC)
+        {
+            // Parse payload (little-endian int32_t array).
+            int32_t p[USB_PAYLOAD_N];
+            memcpy(p, &local[4], USB_PAYLOAD_N * sizeof(int32_t));
 
-        // Apply commands — written from main loop, read by ADC IRQ.
-        __disable_irq();
-        RxCommand cmd{p[0], p[1], static_cast<float>(p[2]) * 0.01f,
-                      static_cast<float>(p[3]) * 0.01f, static_cast<float>(p[4]) * 0.1f};
-        if (rxCb_) rxCb_(cmd, rxCtx_);
-        __enable_irq();
+            // Apply commands — written from main loop, read by ADC IRQ.
+            __disable_irq();
+            RxCommand cmd{p[0], p[1], static_cast<float>(p[2]) * 0.01f,
+                          static_cast<float>(p[3]) * 0.01f, static_cast<float>(p[4]) * 0.1f};
+            if (rxCb_) rxCb_(cmd, rxCtx_);
+            __enable_irq();
+        }
+        else if (magic == USB_SELECT_MAGIC)
+        {
+            // Parse payload as up to 10 uint16_t ids.
+            uint16_t ids[10];
+            memcpy(ids, &local[4], 10 * sizeof(uint16_t));
+            setSelectedIds(ids, 10);
+        }
     }
 
     // -----------------------------------------------------------------------

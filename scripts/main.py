@@ -72,6 +72,7 @@ class SerialReader(threading.Thread):
             buf = b""
             magic_bytes = struct.pack("<H", TX_MAGIC)
             current_state = [0] * 10
+            seen_ids = set()
             
             while not self._stop_evt.is_set():
                 while True:
@@ -109,9 +110,11 @@ class SerialReader(threading.Thread):
                         offset = 6 + i * SAMPLE_BYTES
                         sid, val = struct.unpack_from("<Bh", buf, offset)
                         if 1 <= sid <= 10:
-                            current_state[sid - 1] = val
-                            if sid == 10:
+                            if sid in seen_ids:
                                 batch_samples.append(list(current_state))
+                                seen_ids.clear()
+                            current_state[sid - 1] = val
+                            seen_ids.add(sid)
                     
                     buf = buf[expected_len:]
                     
@@ -445,6 +448,7 @@ class App(tk.Tk):
         # Capture background snapshot layer cache
         self._canvas.draw()
         self._bg_cache = self._canvas.copy_from_bbox(self._fig.bbox)
+        self._send_select_command()
 
     def _update_plot_views(self):
         """Dynamic Blitting Engine."""
@@ -635,6 +639,29 @@ class App(tk.Tk):
                 return
             payload.append(int(val * scale))
         frame = build_frame(payload, self._seq)
+        self._seq += 1
+        self._reader.send(frame)
+
+    def _send_select_command(self):
+        if not self._reader:
+            return
+        
+        # Determine union of checked variables across Plot 1 and Plot 2
+        active_indices = set()
+        for idx, var in self._p1_checks:
+            if var.get():
+                active_indices.add(idx)
+        for idx, var in self._p2_checks:
+            if var.get():
+                active_indices.add(idx)
+        
+        active_ids = sorted([idx + 1 for idx in active_indices])
+        padded_ids = list(active_ids) + [0] * (10 - len(active_ids))
+        padded_ids = padded_ids[:10]
+        
+        USB_SELECT_MAGIC = 0xABCE
+        payload_padding = b'\x00' * 20
+        frame = struct.pack('<HH10H20s', USB_SELECT_MAGIC, self._seq & 0xFFFF, *padded_ids, payload_padding)
         self._seq += 1
         self._reader.send(frame)
 

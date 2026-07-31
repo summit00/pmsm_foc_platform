@@ -45,11 +45,22 @@ inline void motor_control_isr()
 {
     control.run_isr();
 
-    for (const auto& entry : telemetry_registry)
+    for (uint16_t id : g_usb_comm.selectedIds_)
     {
-        if (entry.value_ptr != nullptr)
+        if (id == 0)
         {
-            g_usb_comm.push_sample({entry.id, static_cast<int16_t>(*entry.value_ptr * entry.scale)});
+            continue;
+        }
+        for (const auto& entry : telemetry_registry)
+        {
+            if (entry.id == id)
+            {
+                if (entry.value_ptr != nullptr)
+                {
+                    g_usb_comm.push_sample({static_cast<uint8_t>(id), static_cast<int16_t>(*entry.value_ptr * entry.scale)});
+                }
+                break;
+            }
         }
     }
 }
