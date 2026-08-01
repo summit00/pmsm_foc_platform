@@ -9,7 +9,8 @@
 #include "stm32f7xx_hal.h"
 #include "stm32f7xx_hal_adc_ex.h"
 #include "tick.hpp"
-#include "hal/usb_comm.hpp"
+#include "hal/usb_cdc_transfer.hpp"
+#include "comm/protocol_handler.hpp"
 
 extern "C"
 {
@@ -35,6 +36,12 @@ extern "C"
     extern TIM_HandleTypeDef htim4;
     extern ADC_HandleTypeDef hadc1;
     extern ADC_HandleTypeDef hadc2;
+}
+
+namespace platform
+{
+    inline hal::UsbCdcTransfer g_usb_cdc_transfer;
+    inline comm::ProtocolHandler g_protocol_handler(g_usb_cdc_transfer, comm::g_telemetry_manager);
 }
 
 namespace app
@@ -89,8 +96,8 @@ struct MainApp
 
         MX_USB_DEVICE_Init();
         HAL_NVIC_SetPriority(OTG_FS_IRQn, 6, 0);
-        platform::g_usb_comm.init();
-        platform::g_usb_comm.setRxCallback([](const platform::RxCommand& c, void* ctx) {
+        comm::g_telemetry_manager.init();
+        platform::g_protocol_handler.setRxCallback([](const comm::ProtocolHandler::RxCommand& c, void* ctx) {
             auto& ui = *static_cast<app::UserInterface*>(ctx);
             ui.mEnable = c.enable != 0;
             ui.mMode = static_cast<uint8_t>(c.mode);
@@ -117,7 +124,8 @@ struct MainApp
             {
                 last_usb = now;
                 // last_usb += cycle_counter.cycles_per_second() / 1000; // avoid drift
-                platform::g_usb_comm.update();
+                platform::g_usb_cdc_transfer.poll_rx();
+                platform::g_protocol_handler.update();
             }
         }
     }

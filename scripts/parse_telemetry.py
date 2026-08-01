@@ -8,7 +8,7 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
     
-    tel_hpp_path = os.path.join(project_root, "hal", "telemetry_registry.hpp")
+    tel_hpp_path = os.path.join(project_root, "comm", "telemetry_registry.hpp")
     json_path = os.path.join(project_root, "app", "telemetry_registry.json")
 
     if not os.path.exists(tel_hpp_path):

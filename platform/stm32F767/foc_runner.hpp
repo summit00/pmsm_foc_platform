@@ -7,7 +7,7 @@
 #include "gate_driver_enable.hpp"
 #include "inverter.hpp"
 #include "motor_params.hpp"
-#include "hal/usb_comm.hpp"
+#include "comm/telemetry_manager.hpp"
 
 extern "C"
 {
@@ -45,24 +45,7 @@ inline void motor_control_isr()
 {
     control.run_isr();
 
-    for (uint16_t id : g_usb_comm.selectedIds_)
-    {
-        if (id == 0)
-        {
-            continue;
-        }
-        for (const auto& entry : telemetry_registry)
-        {
-            if (entry.id == id)
-            {
-                if (entry.value_ptr != nullptr)
-                {
-                    g_usb_comm.push_sample({static_cast<uint8_t>(id), static_cast<int16_t>(*entry.value_ptr * entry.scale)});
-                }
-                break;
-            }
-        }
-    }
+    comm::g_telemetry_manager.capture_telemetry_isr();
 }
 
 inline void calibrate_current_sense()
