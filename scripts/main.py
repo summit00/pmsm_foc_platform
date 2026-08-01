@@ -191,16 +191,22 @@ class App(tk.Tk):
         self._reader = None
         self._seq    = 0
         
-        # Load registry variables
-        self._telemetry_vars = REGISTRY["telemetry"]
-        self._telemetry_by_id = {v["id"]: v for v in self._telemetry_vars}
-        
-        # Initial Plot Selection matching standard values:
-        # Plot 1: Udc_V (ID 1)
-        # Plot 2: Id_A (ID 7), Iq_A (ID 8)
         self._selected_p1 = {1}
         self._selected_p2 = {7, 8}
         self._current_vals_str = {}
+        
+        # Resolve registry JSON file path relative to main.py
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(script_dir)
+        default_json = os.path.join(project_root, "app", "telemetry_registry.json")
+        
+        self._telemetry_vars = []
+        self._telemetry_by_id = {}
+        
+        if os.path.exists(default_json):
+            self._load_json_file(default_json)
+        else:
+            self._load_fallback_registry()
         
         # Consistent pixel depth horizontal density buffer
         self.PLOT_WINDOW_POINTS = 1000
@@ -222,6 +228,58 @@ class App(tk.Tk):
         
         self.after(500, self._rebuild_axes_and_cache)
         self._start_loops()
+
+    def _load_json_dialog(self):
+        from tkinter import filedialog
+        filename = filedialog.askopenfilename(
+            title="Select Telemetry JSON Registry",
+            filetypes=[("JSON Files", "*.json"), ("All Files", "*.*")]
+        )
+        if filename:
+            self._load_json_file(filename)
+
+    def _load_json_file(self, filename):
+        try:
+            with open(filename, "r") as f:
+                registry = json.load(f)
+            
+            self._telemetry_vars = registry["telemetry"]
+            self._telemetry_by_id = {v["id"]: v for v in self._telemetry_vars}
+            
+            # Sanitize selections against new registry IDs
+            all_ids = set(v["id"] for v in self._telemetry_vars)
+            self._selected_p1 = {vid for vid in self._selected_p1 if vid in all_ids}
+            self._selected_p2 = {vid for vid in self._selected_p2 if vid in all_ids}
+            
+            # Rebuild defaults if selections are empty
+            if not self._selected_p1 and self._telemetry_vars:
+                self._selected_p1 = {self._telemetry_vars[0]["id"]}
+            if not self._selected_p2 and len(self._telemetry_vars) > 1:
+                self._selected_p2 = {self._telemetry_vars[1]["id"]}
+                
+            self._current_vals_str.clear()
+            
+            if hasattr(self, "_tree"):
+                self._update_tree()
+                self._rebuild_axes_and_cache()
+                self._log(f"Loaded telemetry: {os.path.basename(filename)}")
+        except Exception as e:
+            if hasattr(self, "_tree"):
+                self._log(f"Failed to load JSON: {e}")
+            else:
+                print(f"Failed to load default JSON: {e}")
+
+    def _load_fallback_registry(self):
+        self._telemetry_vars = [
+            {"id": 1, "name": "Udc_V", "scale": 100.0, "unit": "V", "description": "DC Link Bus Voltage"},
+            {"id": 2, "name": "demandSpeed_rpm", "scale": 1.0, "unit": "rpm", "description": "Demand Speed"},
+            {"id": 3, "name": "feedbackSpeed_rpm", "scale": 1.0, "unit": "rpm", "description": "Feedback Speed"},
+            {"id": 4, "name": "encoderSpeed_rpm", "scale": 1.0, "unit": "rpm", "description": "Encoder Speed"},
+            {"id": 5, "name": "observerSpeed_rpm", "scale": 1.0, "unit": "rpm", "description": "Observer Speed"},
+            {"id": 7, "name": "Id_A", "scale": 1000.0, "unit": "A", "description": "D-axis Current"},
+            {"id": 8, "name": "Iq_A", "scale": 1000.0, "unit": "A", "description": "Q-axis Current"}
+        ]
+        self._telemetry_by_id = {v["id"]: v for v in self._telemetry_vars}
 
     def _apply_style(self):
         style = ttk.Style(self)
@@ -297,8 +355,10 @@ class App(tk.Tk):
         self._conn_btn = ttk.Button(conn, text="Connect", command=self._toggle_connect)
         self._conn_btn.grid(row=0, column=5, **pad)
 
+        ttk.Button(conn, text="Load JSON", command=self._load_json_dialog).grid(row=0, column=6, **pad)
+
         self._status_lbl = ttk.Label(conn, text="● Disconnected", foreground="#ef4444", width=22)
-        self._status_lbl.grid(row=0, column=6, **pad)
+        self._status_lbl.grid(row=0, column=7, **pad)
 
         # Commands Panel
         tx_frame = ttk.LabelFrame(self, text="Commands  (PC → MCU)")
