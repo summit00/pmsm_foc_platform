@@ -71,17 +71,49 @@ class TelemetryManager
   public:
     static constexpr size_t MAX_SELECTED_IDS = 10;
 
+    struct ActiveTelemetry
+    {
+        const float* value_ptr = nullptr;
+        float scale = 0.0f;
+        uint8_t id = 0;
+    };
+
     void set_selected_ids(const uint16_t* ids, size_t count)
     {
-        __disable_irq();
+        ActiveTelemetry temp_entries[MAX_SELECTED_IDS] = {};
+        uint16_t temp_ids[MAX_SELECTED_IDS] = {};
         size_t n = (count > MAX_SELECTED_IDS) ? MAX_SELECTED_IDS : count;
+
         for (size_t i = 0; i < n; ++i)
         {
-            selected_ids_[i] = ids[i];
+            uint16_t target_id = ids[i];
+            temp_ids[i] = target_id;
+            if (target_id == 0)
+            {
+                continue;
+            }
+
+            for (const auto& entry : platform::telemetry_registry)
+            {
+                if (entry.id == target_id)
+                {
+                    temp_entries[i].value_ptr = entry.value_ptr;
+                    temp_entries[i].scale = entry.scale;
+                    temp_entries[i].id = static_cast<uint8_t>(target_id);
+                    break;
+                }
+            }
         }
         for (size_t i = n; i < MAX_SELECTED_IDS; ++i)
         {
-            selected_ids_[i] = 0;
+            temp_ids[i] = 0;
+        }
+
+        __disable_irq();
+        for (size_t i = 0; i < MAX_SELECTED_IDS; ++i)
+        {
+            selected_ids_[i] = temp_ids[i];
+            active_entries_[i] = temp_entries[i];
         }
         __enable_irq();
     }
@@ -93,18 +125,15 @@ class TelemetryManager
 
     void init()
     {
-        // Initialize with first 10 entries from telemetry registry
+        uint16_t ids[MAX_SELECTED_IDS] = {};
         size_t init_count = (platform::TELEMETRY_REGISTRY_SIZE < MAX_SELECTED_IDS)
                                 ? platform::TELEMETRY_REGISTRY_SIZE
                                 : MAX_SELECTED_IDS;
         for (size_t i = 0; i < init_count; ++i)
         {
-            selected_ids_[i] = platform::telemetry_registry[i].id;
+            ids[i] = platform::telemetry_registry[i].id;
         }
-        for (size_t i = init_count; i < MAX_SELECTED_IDS; ++i)
-        {
-            selected_ids_[i] = 0;
-        }
+        set_selected_ids(ids, init_count);
     }
 
     void push_sample(const platform::Sample& sample)
@@ -122,32 +151,22 @@ class TelemetryManager
         return tx_queue_.size();
     }
 
-    // Call from high-frequency ISR context to snapshot active variables
+    // Optimized capture loop: runs in O(1) constant time without registry lookups
     void capture_telemetry_isr()
     {
-        for (uint16_t id : selected_ids_)
+        for (size_t i = 0; i < MAX_SELECTED_IDS; ++i)
         {
-            if (id == 0)
+            const auto& t = active_entries_[i];
+            if (t.value_ptr != nullptr)
             {
-                continue;
-            }
-            for (const auto& entry : platform::telemetry_registry)
-            {
-                if (entry.id == id)
-                {
-                    if (entry.value_ptr != nullptr)
-                    {
-                        tx_queue_.push({static_cast<uint8_t>(id),
-                                        static_cast<int16_t>(*entry.value_ptr * entry.scale)});
-                    }
-                    break;
-                }
+                tx_queue_.push({t.id, static_cast<int16_t>(*t.value_ptr * t.scale)});
             }
         }
     }
 
   private:
     uint16_t selected_ids_[MAX_SELECTED_IDS] = {};
+    ActiveTelemetry active_entries_[MAX_SELECTED_IDS] = {};
     platform::RingBuffer<platform::Sample, 2048> tx_queue_;
 };
 
