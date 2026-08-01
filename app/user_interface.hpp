@@ -15,18 +15,27 @@ struct UserInterface
 
     // Telemetry
     float Udc_V = 0.0f;
+    float demandSpeed_rpm = 0.0f;
+    float feedbackSpeed_rpm = 0.0f;
+    float encoderSpeed_rpm = 0.0f;
+    float observerSpeed_rpm = 0.0f;
+    float openLoopSpeed_rpm = 0.0f;
     float Id_A = 0.0f;
     float Iq_A = 0.0f;
-    float demandSpeed_rpm = 0.0f;
-    float openLoopSpeed_rpm = 0.0f;
-    float encoderSpeed_rpm = 0.0f;
-    float feedbackSpeed_rpm = 0.0f;
-    float observerSpeed_rpm = 0.0f;
     float IdRef_A = 0.0f;
     float IqRef_A = 0.0f;
+    float Ud_V = 0.0f;
+    float Uq_V = 0.0f;
     float encoderAngle_deg = 0.0f;
     float observerAngle_deg = 0.0f;
     float angleError_deg = 0.0f;
+    float Ialpha_A = 0.0f;
+    float Ibeta_A = 0.0f;
+    float Ualpha_V = 0.0f;
+    float Ubeta_V = 0.0f;
+    float temp_C = 0.0f;
+    float errorState = 0.0f;
+    float autoSetupState = 0.0f;
 };
 
 } // namespace app

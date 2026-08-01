@@ -1,0 +1,185 @@
+{
+  "commands": [
+    {
+      "name": "mEnable",
+      "type": "uint8_t",
+      "default": 0
+    },
+    {
+      "name": "mMode",
+      "type": "uint8_t",
+      "default": 0
+    },
+    {
+      "name": "targetSpeed_rpm",
+      "type": "float",
+      "default": 0.0
+    },
+    {
+      "name": "mAcceleration_rpm_s",
+      "type": "float",
+      "default": 500.0
+    },
+    {
+      "name": "mIsAbs_mA",
+      "type": "float",
+      "default": 0.0
+    }
+  ],
+  "telemetry": [
+    {
+      "id": 1,
+      "name": "Udc_V",
+      "scale": 100.0,
+      "unit": "V",
+      "description": "DC Link Bus Voltage"
+    },
+    {
+      "id": 2,
+      "name": "demandSpeed_rpm",
+      "scale": 1.0,
+      "unit": "rpm",
+      "description": "Demand Electrical Speed"
+    },
+    {
+      "id": 3,
+      "name": "feedbackSpeed_rpm",
+      "scale": 1.0,
+      "unit": "rpm",
+      "description": "Feedback Rotor Speed"
+    },
+    {
+      "id": 4,
+      "name": "encoderSpeed_rpm",
+      "scale": 1.0,
+      "unit": "rpm",
+      "description": "Encoder Measured Speed"
+    },
+    {
+      "id": 5,
+      "name": "observerSpeed_rpm",
+      "scale": 1.0,
+      "unit": "rpm",
+      "description": "Observer Estimated Speed"
+    },
+    {
+      "id": 6,
+      "name": "openLoopSpeed_rpm",
+      "scale": 1.0,
+      "unit": "rpm",
+      "description": "Open Loop Speed"
+    },
+    {
+      "id": 7,
+      "name": "Id_A",
+      "scale": 1000.0,
+      "unit": "A",
+      "description": "D-axis feedback current"
+    },
+    {
+      "id": 8,
+      "name": "Iq_A",
+      "scale": 1000.0,
+      "unit": "A",
+      "description": "Q-axis feedback current"
+    },
+    {
+      "id": 9,
+      "name": "IdRef_A",
+      "scale": 1000.0,
+      "unit": "A",
+      "description": "D-axis reference current"
+    },
+    {
+      "id": 10,
+      "name": "IqRef_A",
+      "scale": 1000.0,
+      "unit": "A",
+      "description": "Q-axis reference current"
+    },
+    {
+      "id": 11,
+      "name": "Ud_V",
+      "scale": 1000.0,
+      "unit": "V",
+      "description": "D-axis voltage command"
+    },
+    {
+      "id": 12,
+      "name": "Uq_V",
+      "scale": 1000.0,
+      "unit": "V",
+      "description": "Q-axis voltage command"
+    },
+    {
+      "id": 13,
+      "name": "encoderAngle_deg",
+      "scale": 100.0,
+      "unit": "deg",
+      "description": "Rotor electrical angle from encoder"
+    },
+    {
+      "id": 14,
+      "name": "observerAngle_deg",
+      "scale": 100.0,
+      "unit": "deg",
+      "description": "Rotor electrical angle from observer"
+    },
+    {
+      "id": 15,
+      "name": "angleError_deg",
+      "scale": 100.0,
+      "unit": "deg",
+      "description": "Error between encoder and observer angle"
+    },
+    {
+      "id": 16,
+      "name": "Ialpha_A",
+      "scale": 1000.0,
+      "unit": "A",
+      "description": "Alpha current component"
+    },
+    {
+      "id": 17,
+      "name": "Ibeta_A",
+      "scale": 1000.0,
+      "unit": "A",
+      "description": "Beta current component"
+    },
+    {
+      "id": 18,
+      "name": "Ualpha_V",
+      "scale": 1000.0,
+      "unit": "V",
+      "description": "Alpha voltage component"
+    },
+    {
+      "id": 19,
+      "name": "Ubeta_V",
+      "scale": 1000.0,
+      "unit": "V",
+      "description": "Beta voltage component"
+    },
+    {
+      "id": 20,
+      "name": "temp_C",
+      "scale": 10.0,
+      "unit": "C",
+      "description": "Inverter temperature"
+    },
+    {
+      "id": 21,
+      "name": "errorState",
+      "scale": 1.0,
+      "unit": "",
+      "description": "Motor error/fault state code"
+    },
+    {
+      "id": 22,
+      "name": "autoSetupState",
+      "scale": 1.0,
+      "unit": "",
+      "description": "Autosetup sequence state code"
+    }
+  ]
+}

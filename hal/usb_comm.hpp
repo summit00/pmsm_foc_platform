@@ -1,7 +1,8 @@
 #pragma once
 #include <cstdint>
 #include <cstring>
-#include "user_interface.hpp"
+#include "telemetry_registry.hpp"
+
 
 extern "C"
 {
@@ -65,26 +66,6 @@ static constexpr uint16_t USB_FRAME_BYTES = 4u + USB_PAYLOAD_N * 4u; // 44 for R
 struct __attribute__((packed)) Sample {
     uint8_t id;
     int16_t value;
-};
-
-struct TelemetryRegistryEntry {
-    const char* name;
-    uint8_t id;
-    const float* value_ptr;
-    float scale;
-};
-
-static constexpr TelemetryRegistryEntry telemetry_registry[] = {
-    {"Udc_V",             1,  &ui.Udc_V,             100.0f},
-    {"demandSpeed_rpm",   2,  &ui.demandSpeed_rpm,   1.0f},
-    {"feedbackSpeed_rpm", 3,  &ui.feedbackSpeed_rpm, 1.0f},
-    {"encoderSpeed_rpm",  4,  &ui.encoderSpeed_rpm,  1.0f},
-    {"observerSpeed_rpm", 5,  &ui.observerSpeed_rpm, 1.0f},
-    {"Id_A",              6,  &ui.Id_A,              1000.0f},
-    {"Iq_A",              7,  &ui.Iq_A,              1000.0f},
-    {"encoderAngle_deg",  8,  &ui.encoderAngle_deg,  100.0f},
-    {"observerAngle_deg", 9,  &ui.observerAngle_deg, 100.0f},
-    {"angleError_deg",    10, &ui.angleError_deg,    100.0f}
 };
 
 // Lock-free single-producer, single-consumer ring buffer
@@ -164,9 +145,14 @@ class UsbComm
     {
         tx_seq_ = 0;
         last_rx_seq_ = 0xFFFFu; // force first frame to be accepted
-        for (size_t i = 0; i < 10; ++i)
+        size_t init_count = (TELEMETRY_REGISTRY_SIZE < 10) ? TELEMETRY_REGISTRY_SIZE : 10;
+        for (size_t i = 0; i < init_count; ++i)
         {
             selectedIds_[i] = telemetry_registry[i].id;
+        }
+        for (size_t i = init_count; i < 10; ++i)
+        {
+            selectedIds_[i] = 0;
         }
     }
 
