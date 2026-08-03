@@ -3,7 +3,7 @@
 #include <tuple>
 #include "foc.hpp"
 #include "auto_setup.hpp"
-#include "ramp_generator.hpp"
+#include "sensor_selector.hpp"
 #include "math.hpp"
 
 namespace app
@@ -26,20 +26,39 @@ class ModeManager
   public:
     struct ExecutionContext
     {
-        float activeOmega_rad_Hz;
-        float thetaOpenLoop_rad;
-        float thetaEncoder_rad;
-        float id_A;
-        float iq_A;
-        float ud_V;
-        float uq_V;
-        float targetCurrent_A;
-        float targetSpeed_rpm;
-        float acceleration_rpm_s;
-        float polePairs;
-        float omegaRef_rad_Hz;
-        bool isClosedLoop;
-        bool isDriveEnabled;
+        struct Currents
+        {
+            float id_A = 0.0f;
+            float iq_A = 0.0f;
+        } currents;
+
+        struct Voltages
+        {
+            float ud_V = 0.0f;
+            float uq_V = 0.0f;
+        } voltages;
+
+        struct Sensors
+        {
+            float activeOmega_rad_Hz = 0.0f;
+            float thetaOpenLoop_rad = 0.0f;
+            float thetaEncoder_rad = 0.0f;
+        } sensors;
+
+        struct Reference
+        {
+            float targetCurrent_A = 0.0f;
+            float targetSpeed_rpm = 0.0f;
+            float acceleration_rpm_s = 0.0f;
+            float omegaRef_rad_Hz = 0.0f;
+            float polePairs = 0.0f;
+        } reference;
+
+        struct Flags
+        {
+            bool isClosedLoop = false;
+            bool isDriveEnabled = false;
+        } flags;
     };
 
     struct OutputRefs
@@ -50,11 +69,11 @@ class ModeManager
         float injectedUq_V = 0.0f;
         bool bypassCurrentControl = false;
         float omegaRef_rad_Hz = 0.0f;
-        uint8_t requestedSensorMode = 0; // 0 = OpenLoop, 1 = Encoder, 2 = EmkObserver
+        SensorSelector::SensorType requestedSensor = SensorSelector::SensorType::OpenLoop;
     };
 
-    explicit ModeManager(FOC& foc, AutoSetup& autoSetup, RampGenerator& speedRamp)
-        : mFoc(foc), mAutoSetup(autoSetup), mSpeedRamp(speedRamp)
+    explicit ModeManager(FOC& foc, AutoSetup& autoSetup)
+        : mFoc(foc), mAutoSetup(autoSetup)
     {
     }
 
@@ -63,7 +82,6 @@ class ModeManager
         if (mMode != newMode)
         {
             mAutoSetup.reset();
-            mSpeedRamp.reset(0.0f);
             mSpeedLoopCounter = 0;
             mIdRef_A_last = 0.0f;
             mIqRef_A_last = 0.0f;
@@ -77,9 +95,8 @@ class ModeManager
     {
         OutputRefs out;
 
-        if (!ctx.isDriveEnabled)
+        if (!ctx.flags.isDriveEnabled)
         {
-            mSpeedRamp.reset(0.0f);
             mAutoSetup.reset();
             return out;
         }
@@ -114,12 +131,12 @@ class ModeManager
     {
         if (mAutoSetup.getState() == AutoSetup::State::IDLE)
         {
-            mAutoSetup.startAutoSetup(ctx.targetCurrent_A);
+            mAutoSetup.startAutoSetup(ctx.reference.targetCurrent_A);
             mFoc.setCurrentControlGainsManual(0.5f, 0.01f);
         }
 
         auto refs = mAutoSetup.step(
-            ctx.id_A, ctx.iq_A, ctx.ud_V, ctx.uq_V, ctx.thetaOpenLoop_rad, ctx.thetaEncoder_rad);
+            ctx.currents.id_A, ctx.currents.iq_A, ctx.voltages.ud_V, ctx.voltages.uq_V, ctx.sensors.thetaOpenLoop_rad, ctx.sensors.thetaEncoder_rad);
 
         out.idRef_A = refs.IdRef_A;
         out.iqRef_A = refs.IqRef_A;
@@ -127,7 +144,7 @@ class ModeManager
         out.injectedUq_V = refs.UqInject_V;
         out.bypassCurrentControl = refs.BypassCurrentControl;
         out.omegaRef_rad_Hz = refs.OmegaRef_rad_Hz;
-        out.requestedSensorMode = refs.sensorMode;
+        out.requestedSensor = static_cast<SensorSelector::SensorType>(refs.sensorMode);
 
         if (refs.TriggerTuning)
         {
@@ -137,13 +154,13 @@ class ModeManager
 
     void runVelocityStep(const ExecutionContext& ctx, OutputRefs& out)
     {
-        out.omegaRef_rad_Hz = ctx.omegaRef_rad_Hz;
+        out.omegaRef_rad_Hz = ctx.reference.omegaRef_rad_Hz;
 
-        if (!ctx.isClosedLoop)
+        if (!ctx.flags.isClosedLoop)
         {
-            out.idRef_A = ctx.targetCurrent_A;
+            out.idRef_A = ctx.reference.targetCurrent_A;
             out.iqRef_A = 0.0f;
-            out.requestedSensorMode = 0; // OpenLoop
+            out.requestedSensor = SensorSelector::SensorType::OpenLoop;
         }
         else
         {
@@ -151,20 +168,20 @@ class ModeManager
             {
                 mSpeedLoopCounter = 0;
                 std::tie(mIdRef_A_last, mIqRef_A_last) = mFoc.runSpeedControl(
-                    out.omegaRef_rad_Hz, ctx.activeOmega_rad_Hz, ctx.targetCurrent_A, ctx.isDriveEnabled);
+                    out.omegaRef_rad_Hz, ctx.sensors.activeOmega_rad_Hz, ctx.reference.targetCurrent_A, ctx.flags.isDriveEnabled);
             }
             out.idRef_A = mIdRef_A_last;
             out.iqRef_A = mIqRef_A_last;
-            out.requestedSensorMode = 1; // Encoder
+            out.requestedSensor = SensorSelector::SensorType::Encoder;
         }
     }
 
     void runTorqueStep(const ExecutionContext& ctx, OutputRefs& out)
     {
         out.idRef_A = 0.0f;
-        out.iqRef_A = ctx.targetCurrent_A;
-        out.omegaRef_rad_Hz = ctx.activeOmega_rad_Hz;
-        out.requestedSensorMode = 1; // Encoder
+        out.iqRef_A = ctx.reference.targetCurrent_A;
+        out.omegaRef_rad_Hz = ctx.sensors.activeOmega_rad_Hz;
+        out.requestedSensor = SensorSelector::SensorType::Encoder;
     }
 
     void runPositionStep(const ExecutionContext& /*ctx*/, OutputRefs& out)
@@ -172,12 +189,11 @@ class ModeManager
         out.idRef_A = 0.0f;
         out.iqRef_A = 0.0f;
         out.omegaRef_rad_Hz = 0.0f;
-        out.requestedSensorMode = 1; // Encoder
+        out.requestedSensor = SensorSelector::SensorType::Encoder;
     }
 
     FOC& mFoc;
     AutoSetup& mAutoSetup;
-    RampGenerator& mSpeedRamp;
 
     ControlMode mMode = ControlMode::Idle;
     uint32_t mSpeedLoopCounter = 0;

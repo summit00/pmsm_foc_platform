@@ -51,9 +51,9 @@ class Control
                          motor_params.encoderOffset_ticks),
           mEmkObserver(pwmPeriod_s, motor_params),
           mSensorSelector(mOpenLoopSensor, mEncoderSensor, mEmkObserver),
-          mFoc(motor_params, pwmPeriod_s), mFaultManager(), mSpeedRamp(pwmPeriod_s),
-          mAutoSetup(mMotorParams, pwmPeriod_s), mDsmHardware(*this), mDsm(mDsmHardware),
-          mModeManager(mFoc, mAutoSetup, mSpeedRamp)
+          mFoc(motor_params, pwmPeriod_s), mFaultManager(), mSpeedRamp(pwmPeriod_s), mAutoSetup(mMotorParams, pwmPeriod_s),
+          mDsmHardware(*this), mDsm(mDsmHardware),
+          mModeManager(mFoc, mAutoSetup)
     {
         mUdcBus_V = mAdcSense.read_bus_voltage();
         mTemp_C = mAdcSense.read_temperature_celsius();
@@ -220,21 +220,19 @@ class Control
         std::tie(mId_A, mIq_A) = mTransforms.park(mIalpha_A, mIbeta_A, activeTheta_rad);
 
         ModeManager::OutputRefs modeRefs =
-            mModeManager.step({.activeOmega_rad_Hz = activeOmega_rad_Hz,
-                               .thetaOpenLoop_rad = mOpenLoopSensor.getTheta_rad(),
-                               .thetaEncoder_rad = mEncoderSensor.getTheta_rad(),
-                               .id_A = mId_A,
-                               .iq_A = mIq_A,
-                               .ud_V = mUd_V,
-                               .uq_V = mUq_V,
-                               .targetCurrent_A = mIsAbs_A,
-                               .targetSpeed_rpm = mUi.targetSpeed_rpm,
-                               .acceleration_rpm_s = mUi.mAcceleration_rpm_s,
-                               .polePairs = static_cast<float>(mMotorParams.polePairs),
-                               .omegaRef_rad_Hz = mOmegaRef_rad_Hz,
-                               .isClosedLoop = (mSensorSelector.getSelectedType() !=
-                                                SensorSelector::SensorType::OpenLoop),
-                               .isDriveEnabled = mMotorEnabled_bool});
+            mModeManager.step({.currents = {.id_A = mId_A, .iq_A = mIq_A},
+                               .voltages = {.ud_V = mUd_V, .uq_V = mUq_V},
+                               .sensors = {.activeOmega_rad_Hz = activeOmega_rad_Hz,
+                                           .thetaOpenLoop_rad = mOpenLoopSensor.getTheta_rad(),
+                                           .thetaEncoder_rad = mEncoderSensor.getTheta_rad()},
+                               .reference = {.targetCurrent_A = mIsAbs_A,
+                                             .targetSpeed_rpm = mUi.targetSpeed_rpm,
+                                             .acceleration_rpm_s = mUi.mAcceleration_rpm_s,
+                                             .omegaRef_rad_Hz = mOmegaRef_rad_Hz,
+                                             .polePairs = static_cast<float>(mMotorParams.polePairs)},
+                               .flags = {.isClosedLoop = (mSensorSelector.getSelectedType() !=
+                                                          SensorSelector::SensorType::OpenLoop),
+                                         .isDriveEnabled = mMotorEnabled_bool}});
 
         mIdRef_A = modeRefs.idRef_A;
         mIqRef_A = modeRefs.iqRef_A;
@@ -245,10 +243,9 @@ class Control
 
         // Apply requested sensor mode change from Mode Manager
         if (mModeManager.getMode() == ControlMode::Autosetup &&
-            modeRefs.requestedSensorMode != static_cast<uint8_t>(mSensorSelector.getSelectedType()))
+            modeRefs.requestedSensor != mSensorSelector.getSelectedType())
         {
-            mSensorSelector.selectSensor(
-                static_cast<SensorSelector::SensorType>(modeRefs.requestedSensorMode));
+            mSensorSelector.selectSensor(modeRefs.requestedSensor);
         }
 
         if (!bypassCurrentControl)
@@ -394,6 +391,7 @@ class Control
         if (targetMode != mModeManager.getMode())
         {
             mModeManager.setMode(targetMode);
+            mSpeedRamp.reset(0.0f);
         }
 
         if (targetSensor != mSensorSelector.getSelectedType())

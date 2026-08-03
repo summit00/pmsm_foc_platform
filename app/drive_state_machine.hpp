@@ -167,42 +167,99 @@ class DriveStateMachine
     bool isEnabled() const { return mState == DriveState::Enabled; }
 
   private:
+    void onEnterPowerOff()
+    {
+        mHardware.disablePwm();
+        mHardware.disableGateDriver();
+    }
+
+    void onEnterInit()
+    {
+        mHardware.disablePwm();
+        mHardware.disableGateDriver();
+    }
+
+    void onEnterReady()
+    {
+        mHardware.disablePwm();
+        mHardware.disableGateDriver();
+    }
+
+    void onEnterEnabling()
+    {
+        mHardware.enableGateDriver();
+    }
+
+    void onEnterEnabled()
+    {
+        mHardware.resetControllers();
+        mHardware.enablePwm();
+    }
+
+    void onEnterFault()
+    {
+        mHardware.disablePwm();
+        mHardware.disableGateDriver();
+    }
+
+    void onExitEnabling(DriveState nextState)
+    {
+        if (nextState != DriveState::Enabled)
+        {
+            mHardware.disablePwm();
+            mHardware.disableGateDriver();
+        }
+    }
+
+    void onExitEnabled(DriveState nextState)
+    {
+        if (nextState != DriveState::Enabling)
+        {
+            mHardware.disablePwm();
+            mHardware.disableGateDriver();
+        }
+    }
+
     void transitionTo(DriveState newState)
     {
-        // Safety action when leaving Enabled or Enabling states
-        if (mState == DriveState::Enabled || mState == DriveState::Enabling)
+        if (mState == newState)
         {
-            if (newState != DriveState::Enabled && newState != DriveState::Enabling)
-            {
-                mHardware.disablePwm();
-                mHardware.disableGateDriver();
-            }
+            return;
+        }
+
+        switch (mState)
+        {
+            case DriveState::Enabling:
+                onExitEnabling(newState);
+                break;
+            case DriveState::Enabled:
+                onExitEnabled(newState);
+                break;
+            default:
+                break;
         }
 
         mState = newState;
 
-        // Entry actions for the new state
         switch (mState)
         {
             case DriveState::PowerOff:
+                onEnterPowerOff();
+                break;
             case DriveState::Init:
+                onEnterInit();
+                break;
             case DriveState::Ready:
-                mHardware.disablePwm();
-                mHardware.disableGateDriver();
+                onEnterReady();
                 break;
-
             case DriveState::Enabling:
-                mHardware.enableGateDriver();
+                onEnterEnabling();
                 break;
-
             case DriveState::Enabled:
-                mHardware.resetControllers();
-                mHardware.enablePwm();
+                onEnterEnabled();
                 break;
-
             case DriveState::Fault:
-                mHardware.disablePwm();
-                mHardware.disableGateDriver();
+                onEnterFault();
                 break;
         }
     }
