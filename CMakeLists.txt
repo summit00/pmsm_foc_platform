@@ -2,6 +2,17 @@ cmake_minimum_required(VERSION 3.20)
 
 project(pmsm_foc_platform LANGUAGES C CXX ASM)
 
+# Generate Telemetry JSON Registry from C++ Source of Truth
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+execute_process(
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/parse_telemetry.py"
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    RESULT_VARIABLE gen_res
+)
+if(NOT gen_res EQUAL 0)
+    message(FATAL_ERROR "Telemetry JSON generation failed with code ${gen_res}")
+endif()
+
 # Add this global definition
 add_definitions(-DUSE_NUCLEO_64)
 

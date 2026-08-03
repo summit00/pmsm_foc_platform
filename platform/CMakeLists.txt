@@ -104,6 +104,7 @@ elseif(TARGET_BOARD STREQUAL "nucleoF767_ihm07")
   )
 
   target_include_directories(${PROJECT_NAME}.elf PRIVATE
+    ${CMAKE_SOURCE_DIR}
     ${CUBE_DIR}/Core/Inc
     ${CUBE_DIR}/USB_DEVICE/App
     ${CUBE_DIR}/USB_DEVICE/Target

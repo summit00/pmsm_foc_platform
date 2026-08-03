@@ -381,6 +381,15 @@ class Control
         mUi.IdRef_A = mIdRef_A;
         mUi.IqRef_A = mIqRef_A;
         mUi.Udc_V = mUdcBus_V;
+        mUi.Ud_V = mUd_V;
+        mUi.Uq_V = mUq_V;
+        mUi.Ualpha_V = mUalpha_V;
+        mUi.Ubeta_V = mUbeta_V;
+        mUi.Ialpha_A = mIalpha_A;
+        mUi.Ibeta_A = mIbeta_A;
+        mUi.temp_C = mTemp_C;
+        mUi.errorState = static_cast<float>(mIsErrorrState);
+        mUi.autoSetupState = static_cast<float>(mAutoSetup.getState());
     }
 
     void updateTelemetry()

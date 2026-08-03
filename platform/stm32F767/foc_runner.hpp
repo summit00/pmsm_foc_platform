@@ -7,7 +7,7 @@
 #include "gate_driver_enable.hpp"
 #include "inverter.hpp"
 #include "motor_params.hpp"
-#include "usb_comm.hpp"
+#include "comm/telemetry_manager.hpp"
 
 extern "C"
 {
@@ -45,19 +45,7 @@ inline void motor_control_isr()
 {
     control.run_isr();
 
-    TelemetrySample sample;
-    sample.Udc_V = static_cast<int16_t>(ui.Udc_V * 100.0f);
-    sample.demandSpeed_rpm = static_cast<int16_t>(ui.demandSpeed_rpm);
-    sample.feedbackSpeed_rpm = static_cast<int16_t>(ui.feedbackSpeed_rpm);
-    sample.encoderSpeed_rpm = static_cast<int16_t>(ui.encoderSpeed_rpm);
-    sample.observerSpeed_rpm = static_cast<int16_t>(ui.observerSpeed_rpm);
-    sample.Id_A = static_cast<int16_t>(ui.Id_A * 1000.0f);
-    sample.Iq_A = static_cast<int16_t>(ui.Iq_A * 1000.0f);
-    sample.encoderAngle_deg = static_cast<int16_t>(ui.encoderAngle_deg * 100.0f);
-    sample.observerAngle_deg = static_cast<int16_t>(ui.observerAngle_deg * 100.0f);
-    sample.angleError_deg = static_cast<int16_t>(ui.angleError_deg * 100.0f);
-
-    g_usb_comm.push_sample(sample);
+    comm::g_telemetry_manager.capture_telemetry_isr();
 }
 
 inline void calibrate_current_sense()
