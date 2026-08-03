@@ -45,7 +45,7 @@ class AutoSetup
 
     struct Config
     {
-        static constexpr uint32_t RS_SETTLE_TICKS = 15000;
+        static constexpr uint32_t RS_SETTLE_TICKS = 10000;
         static constexpr uint32_t RS_MEASURE_SAMPLES = 10000;
         static constexpr uint32_t LS_MEASURE_SAMPLES = 10000;
         static constexpr uint32_t PSI_MEASURE_SAMPLES = 20000;
@@ -53,7 +53,7 @@ class AutoSetup
 
         static constexpr float RS_RAMP_RATE_A_S = 2.0f;
         static constexpr float RS_DISCHARGE_RATE_A_S = 5.0f;
-        static constexpr float ALIGN_ACCEL_RAD_S2 = 150.0f;
+        static constexpr float ALIGN_ACCEL_RAD_S2 = 500.0f;
         static constexpr float STOP_ACCEL_RAD_S2 = 1000.0f;
 
         static constexpr float LS_INJECTION_FREQ_HZ = 1000.0f;

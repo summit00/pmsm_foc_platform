@@ -2,3 +2,4 @@ build/
 build-host/
 .venv/
 .target_config
+doc/

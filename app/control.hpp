@@ -2,10 +2,12 @@
 
 #include "QEI_sensor.hpp"
 #include "auto_setup.hpp"
+#include "control_drive_hardware.hpp"
 #include "emk_observer.hpp"
 #include "fault_manager.hpp"
 #include "foc.hpp"
 #include "interfaces.hpp"
+#include "mode_manager.hpp"
 #include "motor_params.hpp"
 #include "open_loop_sensor.hpp"
 #include "ramp_generator.hpp"
@@ -24,6 +26,7 @@ namespace app
 class Control
 {
   public:
+    friend class ControlDriveHardware;
     enum class Mode : uint8_t
     {
         OPENLOOP = 0,
@@ -39,7 +42,7 @@ class Control
                      UserInterface& ui,
                      float pwmPeriod_s)
         : mAdcSense(adc_sense), mInverter(inverter), mGateEnable(gate_enable),
-          mMotorParams(motor_params), mUi(ui), mFoc(motor_params, pwmPeriod_s),
+          mMotorParams(motor_params), mUi(ui),
           mOpenLoopSensor(pwmPeriod_s, mOmegaRef_rad_Hz, mMotorEnabled_bool),
           mEncoderSensor(encoder,
                          pwmPeriod_s,
@@ -47,12 +50,16 @@ class Control
                          static_cast<float>(motor_params.encoderTicks),
                          motor_params.encoderOffset_ticks),
           mEmkObserver(pwmPeriod_s, motor_params),
-          mSensorSelector(mOpenLoopSensor, mEncoderSensor, mEmkObserver), mFaultManager(),
-          mSpeedRamp(pwmPeriod_s), mAutoSetup(mMotorParams, pwmPeriod_s)
+          mSensorSelector(mOpenLoopSensor, mEncoderSensor, mEmkObserver),
+          mFoc(motor_params, pwmPeriod_s), mFaultManager(), mSpeedRamp(pwmPeriod_s),
+          mAutoSetup(mMotorParams, pwmPeriod_s), mDsmHardware(*this), mDsm(mDsmHardware),
+          mModeManager(mFoc, mAutoSetup, mSpeedRamp)
     {
         mUdcBus_V = mAdcSense.read_bus_voltage();
         mTemp_C = mAdcSense.read_temperature_celsius();
         mFaultManager.clearFaults();
+        mDsm.initialize();
+        mDsm.update();
     }
 
     float getIdRef() const
@@ -72,7 +79,26 @@ class Control
 
     uint8_t getMode() const
     {
-        return static_cast<uint8_t>(mMode);
+        switch (mModeManager.getMode())
+        {
+            case ControlMode::Velocity:
+                if (mSensorSelector.getSelectedType() == SensorSelector::SensorType::OpenLoop)
+                {
+                    return 0; // app::Control::Mode::OPENLOOP
+                }
+                else
+                {
+                    return 1; // app::Control::Mode::CLOSEDLOOP
+                }
+            case ControlMode::Autosetup:
+                return 2; // app::Control::Mode::AUTOSETUP
+            case ControlMode::Torque:
+                return 3;
+            case ControlMode::Position:
+                return 4;
+            default:
+                return 0;
+        }
     }
 
     uint8_t getIsEnabled() const
@@ -193,55 +219,36 @@ class Control
 
         std::tie(mId_A, mIq_A) = mTransforms.park(mIalpha_A, mIbeta_A, activeTheta_rad);
 
-        bool bypassCurrentControl = false;
-        float injectedUd_V = 0.0f;
-        float injectedUq_V = 0.0f;
+        ModeManager::OutputRefs modeRefs =
+            mModeManager.step({.activeOmega_rad_Hz = activeOmega_rad_Hz,
+                               .thetaOpenLoop_rad = mOpenLoopSensor.getTheta_rad(),
+                               .thetaEncoder_rad = mEncoderSensor.getTheta_rad(),
+                               .id_A = mId_A,
+                               .iq_A = mIq_A,
+                               .ud_V = mUd_V,
+                               .uq_V = mUq_V,
+                               .targetCurrent_A = mIsAbs_A,
+                               .targetSpeed_rpm = mUi.targetSpeed_rpm,
+                               .acceleration_rpm_s = mUi.mAcceleration_rpm_s,
+                               .polePairs = static_cast<float>(mMotorParams.polePairs),
+                               .omegaRef_rad_Hz = mOmegaRef_rad_Hz,
+                               .isClosedLoop = (mSensorSelector.getSelectedType() !=
+                                                SensorSelector::SensorType::OpenLoop),
+                               .isDriveEnabled = mMotorEnabled_bool});
 
-        switch (mMode)
+        mIdRef_A = modeRefs.idRef_A;
+        mIqRef_A = modeRefs.iqRef_A;
+        float injectedUd_V = modeRefs.injectedUd_V;
+        float injectedUq_V = modeRefs.injectedUq_V;
+        bool bypassCurrentControl = modeRefs.bypassCurrentControl;
+        mOmegaRef_rad_Hz = modeRefs.omegaRef_rad_Hz;
+
+        // Apply requested sensor mode change from Mode Manager
+        if (mModeManager.getMode() == ControlMode::Autosetup &&
+            modeRefs.requestedSensorMode != static_cast<uint8_t>(mSensorSelector.getSelectedType()))
         {
-            case Mode::OPENLOOP:
-                mIdRef_A = mIsAbs_A;
-                mIqRef_A = 0.0f;
-                break;
-
-            case Mode::CLOSEDLOOP:
-                if (++mSpeedLoopCounter_count >= mSpeedLoopDivider_count)
-                {
-                    mSpeedLoopCounter_count = 0;
-                    std::tie(mIdRef_A, mIqRef_A) = mFoc.runSpeedControl(
-                        mOmegaRef_rad_Hz, activeOmega_rad_Hz, mIsAbs_A, mMotorEnabled_bool);
-                }
-                break;
-
-            case Mode::AUTOSETUP:
-                if (mMotorEnabled_bool)
-                {
-                    if (mAutoSetup.getState() == AutoSetup::State::IDLE)
-                    {
-                        mAutoSetup.startAutoSetup(mIsAbs_A);
-                        mFoc.setCurrentControlGainsManual(0.5f, 0.01f);
-                    }
-
-                    float thetaOpenLoop_rad = mOpenLoopSensor.getTheta_rad();
-                    float thetaEncoder_rad = mEncoderSensor.getTheta_rad();
-                    mAutoSetupRefs = mAutoSetup.step(
-                        mId_A, mIq_A, mUd_V, mUq_V, thetaOpenLoop_rad, thetaEncoder_rad);
-
-                    mIdRef_A = mAutoSetupRefs.IdRef_A;
-                    mIqRef_A = mAutoSetupRefs.IqRef_A;
-                    injectedUd_V = mAutoSetupRefs.UdInject_V;
-                    injectedUq_V = mAutoSetupRefs.UqInject_V;
-                    bypassCurrentControl = mAutoSetupRefs.BypassCurrentControl;
-                    mOmegaRef_rad_Hz = mAutoSetupRefs.OmegaRef_rad_Hz;
-                    mSensorSelector.selectSensor(
-                        static_cast<SensorSelector::SensorType>(mAutoSetupRefs.sensorMode));
-
-                    if (mAutoSetupRefs.TriggerTuning)
-                    {
-                        mFoc.setCurrentControlGains();
-                    }
-                }
-                break;
+            mSensorSelector.selectSensor(
+                static_cast<SensorSelector::SensorType>(modeRefs.requestedSensorMode));
         }
 
         if (!bypassCurrentControl)
@@ -279,11 +286,8 @@ class Control
 
     void handleEnableTransition()
     {
-        if (mCmdMotorEnabled_bool != mMotorEnabled_bool)
-        {
-            mMotorEnabled_bool = mCmdMotorEnabled_bool;
-            mGateEnable.set_enable(mMotorEnabled_bool);
-        }
+        mDsm.update();
+        mMotorEnabled_bool = mDsm.isEnabled();
 
         if (!mMotorEnabled_bool)
         {
@@ -291,22 +295,6 @@ class Control
             mSensorSelector.updateAllSensors();
             mAutoSetup.reset();
             return;
-        }
-    }
-
-    void calculateSpeed()
-    {
-        if (mMotorEnabled_bool)
-        {
-            if (mMode != Mode::AUTOSETUP)
-            {
-                mOmegaRef_rad_Hz = mSpeedRamp.update(mTargetOmega_rad_Hz, mAcceleration_rad_Hz2);
-            }
-        }
-        else
-        {
-            mSpeedRamp.reset(0.0f);
-            mOmegaRef_rad_Hz = 0.0f;
         }
     }
 
@@ -322,6 +310,13 @@ class Control
 
         if (mFaultManager.isFaulted())
         {
+            mDsm.faultDetected();
+            mCmdMotorEnabled_bool = false;
+            mUi.mEnable = 0;
+        }
+
+        if (mDsm.getState() == DriveState::Fault)
+        {
             mCmdMotorEnabled_bool = false;
             mUi.mEnable = 0;
         }
@@ -329,24 +324,81 @@ class Control
         return currents;
     }
 
+    void calculateSpeed()
+    {
+        if (mMotorEnabled_bool)
+        {
+            if (mModeManager.getMode() == ControlMode::Velocity)
+            {
+                mOmegaRef_rad_Hz = mSpeedRamp.update(mTargetOmega_rad_Hz, mAcceleration_rad_Hz2);
+            }
+        }
+        else
+        {
+            mSpeedRamp.reset(0.0f);
+            mOmegaRef_rad_Hz = 0.0f;
+        }
+    }
+
     void readUserCommands()
     {
-        mCmdMotorEnabled_bool = static_cast<bool>(mUi.mEnable);
-
-        Mode newMode = static_cast<Mode>(mUi.mMode);
-        if (newMode != mMode)
+        bool cmdEnable = static_cast<bool>(mUi.mEnable);
+        if (cmdEnable && !mCmdMotorEnabled_bool)
         {
-            mMode = newMode;
-            if (mMode == Mode::OPENLOOP or mMode == Mode::AUTOSETUP)
+            if (mDsm.getState() == DriveState::Fault)
             {
-                mSensorSelector.selectSensor(SensorSelector::SensorType::OpenLoop);
+                mDsm.resetFault();
             }
-            else if (mMode == Mode::CLOSEDLOOP)
+            else
             {
-                mSensorSelector.selectSensor(SensorSelector::SensorType::Encoder);
+                mDsm.startDrive();
             }
+        }
+        else if (!cmdEnable && mCmdMotorEnabled_bool)
+        {
+            mDsm.stopDrive();
+        }
+        mCmdMotorEnabled_bool = cmdEnable;
 
-            mAutoSetup.reset();
+        ControlMode targetMode = ControlMode::Idle;
+        SensorSelector::SensorType targetSensor = SensorSelector::SensorType::Encoder;
+
+        switch (mUi.mMode)
+        {
+            case 0: // OPENLOOP
+                targetMode = ControlMode::Velocity;
+                targetSensor = SensorSelector::SensorType::OpenLoop;
+                break;
+            case 1: // CLOSEDLOOP
+                targetMode = ControlMode::Velocity;
+                targetSensor = SensorSelector::SensorType::Encoder;
+                break;
+            case 2: // AUTOSETUP
+                targetMode = ControlMode::Autosetup;
+                targetSensor = SensorSelector::SensorType::OpenLoop;
+                break;
+            case 3: // TORQUE
+                targetMode = ControlMode::Torque;
+                targetSensor = SensorSelector::SensorType::Encoder;
+                break;
+            case 4: // POSITION
+                targetMode = ControlMode::Position;
+                targetSensor = SensorSelector::SensorType::Encoder;
+                break;
+            default:
+                targetMode = ControlMode::Velocity;
+                targetSensor = SensorSelector::SensorType::Encoder;
+                break;
+        }
+
+        if (targetMode != mModeManager.getMode())
+        {
+            mModeManager.setMode(targetMode);
+        }
+
+        if (targetSensor != mSensorSelector.getSelectedType())
+        {
+            mSensorSelector.selectSensor(targetSensor);
         }
 
         mTargetOmega_rad_Hz =
@@ -436,15 +488,61 @@ class Control
     float mUsLimit_V{};
     uint8_t mIsErrorrState{};
     // State Variables
-    Mode mMode{Mode::OPENLOOP};
     bool mMotorEnabled_bool{false};
     bool mCmdMotorEnabled_bool{false};
     AutoSetupReferences mAutoSetupRefs;
+
+    ControlDriveHardware mDsmHardware;
+    DriveStateMachine mDsm;
+    ModeManager mModeManager;
 
     // Counters
     uint8_t mTelemetryCounter_count{0};
     uint32_t mSpeedLoopCounter_count{0};
     const uint32_t mSpeedLoopDivider_count{10};
 };
+
+// Inline definitions for ControlDriveHardware methods
+inline ControlDriveHardware::ControlDriveHardware(Control& parent) : mParent(parent)
+{
+}
+
+inline void ControlDriveHardware::enableGateDriver()
+{
+    mParent.mGateEnable.set_enable(true);
+}
+
+inline void ControlDriveHardware::disableGateDriver()
+{
+    mParent.mGateEnable.set_enable(false);
+}
+
+inline void ControlDriveHardware::enablePwm()
+{
+}
+inline void ControlDriveHardware::disablePwm()
+{
+}
+
+inline void ControlDriveHardware::resetControllers()
+{
+    mParent.mFoc.resetFoc();
+    mParent.mAutoSetup.reset();
+}
+
+inline bool ControlDriveHardware::isHardwareReady() const
+{
+    return !mParent.mFaultManager.isFaulted();
+}
+
+inline bool ControlDriveHardware::isGateDriverReady() const
+{
+    return true;
+}
+
+inline bool ControlDriveHardware::hasActiveFault() const
+{
+    return mParent.mFaultManager.isFaulted();
+}
 
 } // namespace app
