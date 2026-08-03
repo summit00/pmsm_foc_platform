@@ -20,20 +20,42 @@
 #include <numbers>
 #include <tuple>
 
+/**
+ * @file control.hpp
+ * @brief Core motor control loop runner and coordinator.
+ */
+
 namespace app
 {
 
+/**
+ * @brief Coordinates the motor control loops, sensors, state machines, and interfaces.
+ */
 class Control
 {
   public:
     friend class ControlDriveHardware;
+
+    /**
+     * @brief Control modes mapping to the user interface / system mode.
+     */
     enum class Mode : uint8_t
     {
-        OPENLOOP = 0,
-        CLOSEDLOOP = 1,
-        AUTOSETUP = 2,
+        OPENLOOP = 0,   ///< Open-loop speed control.
+        CLOSEDLOOP = 1, ///< Closed-loop field-oriented speed control.
+        AUTOSETUP = 2,  ///< Automatic tuning/calibration sequence.
     };
 
+    /**
+     * @brief Construct a new Control coordinator object.
+     * @param adc_sense Reference to the ADC sensor interface.
+     * @param inverter Reference to the power stage inverter interface.
+     * @param gate_enable Reference to the gate driver enable interface.
+     * @param encoder Reference to the encoder sensor interface.
+     * @param motor_params Reference to the motor parameters container.
+     * @param ui Reference to the user interface/telemetry container.
+     * @param pwmPeriod_s PWM period in seconds.
+     */
     explicit Control(IADC& adc_sense,
                      IInverter& inverter,
                      IEnableOutput& gate_enable,
@@ -62,21 +84,37 @@ class Control
         mDsm.update();
     }
 
+    /**
+     * @brief Get the direct-axis reference current.
+     * @return D-axis reference current in Amperes.
+     */
     float getIdRef() const
     {
         return mIdRef_A;
     }
 
+    /**
+     * @brief Get the quadrature-axis reference current.
+     * @return Q-axis reference current in Amperes.
+     */
     float getIqRef() const
     {
         return mIqRef_A;
     }
 
+    /**
+     * @brief Get the reference electrical rotor speed.
+     * @return Ramped reference speed in electrical rad/s.
+     */
     float getOmegaRef_rad_Hz() const
     {
         return mOmegaRef_rad_Hz;
     }
 
+    /**
+     * @brief Get the active mode code for the UI.
+     * @return uint8_t UI control mode code.
+     */
     uint8_t getMode() const
     {
         switch (mModeManager.getMode())
@@ -101,106 +139,190 @@ class Control
         }
     }
 
+    /**
+     * @brief Get the active motor enabled state.
+     * @return 1 if enabled, 0 if disabled.
+     */
     uint8_t getIsEnabled() const
     {
         return static_cast<uint8_t>(mMotorEnabled_bool);
     }
 
+    /**
+     * @brief Get the current safety fault status.
+     * @return Fault code from the fault manager.
+     */
     uint8_t getFaultStatus() const
     {
         return mIsErrorrState;
     }
 
+    /**
+     * @brief Get the direct axis current PI controller.
+     * @return Reference to the d-axis PI controller object.
+     */
     const PIController& getIdController() const
     {
         return mFoc.getIdController();
     }
 
+    /**
+     * @brief Get the quadrature axis current PI controller.
+     * @return Reference to the q-axis PI controller object.
+     */
     const PIController& getIqController() const
     {
         return mFoc.getIqController();
     }
 
+    /**
+     * @brief Get the measured direct-axis current.
+     * @return Measured d-axis current in Amperes.
+     */
     float getId_A() const
     {
         return mId_A;
     }
 
+    /**
+     * @brief Get the measured quadrature-axis current.
+     * @return Measured q-axis current in Amperes.
+     */
     float getIq_A() const
     {
         return mIq_A;
     }
 
+    /**
+     * @brief Get the modulating direct-axis voltage command.
+     * @return D-axis voltage in Volts.
+     */
     float getUd_V() const
     {
         return mUd_V;
     }
 
+    /**
+     * @brief Get the modulating quadrature-axis voltage command.
+     * @return Q-axis voltage in Volts.
+     */
     float getUq_V() const
     {
         return mUq_V;
     }
 
+    /**
+     * @brief Get the current open-loop rotor angle.
+     * @return Open-loop rotor angle in electrical radians.
+     */
     float getOpenLoopTheta_rad() const
     {
         return mOpenLoopSensor.getTheta_rad();
     }
 
+    /**
+     * @brief Get the current open-loop electrical rotor speed.
+     * @return Open-loop speed in electrical rad/s.
+     */
     float getOpenLoopOmega_rad_Hz() const
     {
         return mOpenLoopSensor.getOmega_rad_Hz();
     }
 
+    /**
+     * @brief Get the encoder-measured rotor angle.
+     * @return Encoder rotor angle in electrical radians.
+     */
     float getEncoderTheta_rad() const
     {
         return mEncoderSensor.getTheta_rad();
     }
 
+    /**
+     * @brief Get the encoder-measured electrical rotor speed.
+     * @return Encoder speed in electrical rad/s.
+     */
     float getEncoderOmega_rad_Hz() const
     {
         return mEncoderSensor.getOmega_rad_Hz();
     }
 
+    /**
+     * @brief Get the back-EMF observer-estimated rotor angle.
+     * @return Observer rotor angle in electrical radians.
+     */
     float getEmkObserverTheta_rad() const
     {
         return mEmkObserver.getTheta_rad();
     }
 
+    /**
+     * @brief Get the back-EMF observer-estimated electrical rotor speed.
+     * @return Observer speed in electrical rad/s.
+     */
     float getEmkObserverOmega_rad_Hz() const
     {
         return mEmkObserver.getOmega_rad_Hz();
     }
 
+    /**
+     * @brief Get the motor stator winding resistance.
+     * @return Stator resistance in Ohms.
+     */
     float getRs_ohm() const
     {
         return mMotorParams.Rs_ohm;
     }
 
+    /**
+     * @brief Get the motor direct-axis stator inductance.
+     * @return D-axis inductance in Henries.
+     */
     float getLd_H() const
     {
         return mMotorParams.Ld_H;
     }
 
+    /**
+     * @brief Get the motor quadrature-axis stator inductance.
+     * @return Q-axis inductance in Henries.
+     */
     float getLq_H() const
     {
         return mMotorParams.Lq_H;
     }
 
+    /**
+     * @brief Get the motor permanent magnet flux linkage.
+     * @return Flux linkage in Weber-turns.
+     */
     float getPsi_pm_Wb() const
     {
         return mMotorParams.flux_pm_Wb;
     }
 
+    /**
+     * @brief Get the physical encoder offset.
+     * @return Offset in encoder counts/ticks.
+     */
     uint16_t getEncoderOffset_ticks() const
     {
         return mMotorParams.encoderOffset_ticks;
     }
 
+    /**
+     * @brief Get the active state of the auto-tuning sequencer.
+     * @return State code of the autosetup sequence.
+     */
     uint8_t getAutoSetupState() const
     {
         return static_cast<uint8_t>(mAutoSetup.getState());
     }
 
+    /**
+     * @brief Main control interrupt service routine.
+     *        Executes speed ramp, reads sensors, updates state machine, runs FOC loops, and drives the PWM inverter.
+     */
     void run_isr()
     {
         readUserCommands();
@@ -273,6 +395,9 @@ class Control
     }
 
   private:
+    /**
+     * @brief Set sensorless observer data with current FOC alpha/beta parameters.
+     */
     void setSensorlessData()
     {
         mMotorParams.Ialpha_A = mIalpha_A;
@@ -281,6 +406,9 @@ class Control
         mMotorParams.Ubeta_V = mUbeta_V;
     }
 
+    /**
+     * @brief Process drive state transitions and handle motor enable/disable logic.
+     */
     void handleEnableTransition()
     {
         mDsm.update();
@@ -295,6 +423,10 @@ class Control
         }
     }
 
+    /**
+     * @brief Read phase currents, bus voltage, and temperature from ADC, and check for faults.
+     * @return PhaseCurrents Structure containing current phase measurements.
+     */
     PhaseCurrents readHardwareAndCheckFaults()
     {
         PhaseCurrents currents = mAdcSense.read_amps();
@@ -321,6 +453,9 @@ class Control
         return currents;
     }
 
+    /**
+     * @brief Update the speed reference based on acceleration ramps.
+     */
     void calculateSpeed()
     {
         if (mMotorEnabled_bool)
@@ -337,6 +472,9 @@ class Control
         }
     }
 
+    /**
+     * @brief Process user commands (enable/disable request, mode change) from UI.
+     */
     void readUserCommands()
     {
         bool cmdEnable = static_cast<bool>(mUi.mEnable);
@@ -406,6 +544,9 @@ class Control
         mIsAbs_A = mUi.mIsAbs_mA / 1000.0f;
     }
 
+    /**
+     * @brief Write current control variables to UI telemetry.
+     */
     void writeUserTelemetry()
     {
         constexpr float radHzToRpm = 30.0f / std::numbers::pi_v<float>;
@@ -442,102 +583,139 @@ class Control
         mUi.autoSetupState = static_cast<float>(mAutoSetup.getState());
     }
 
+    /**
+     * @brief Update telemetry log data.
+     */
     void updateTelemetry()
     {
         writeUserTelemetry();
     }
 
-    IADC& mAdcSense;
-    IInverter& mInverter;
-    IEnableOutput& mGateEnable;
-    MotorParams& mMotorParams;
-    UserInterface& mUi;
+    IADC& mAdcSense;           ///< ADC sensing interface.
+    IInverter& mInverter;      ///< Power stage inverter interface.
+    IEnableOutput& mGateEnable;///< Gate driver enable interface.
+    MotorParams& mMotorParams; ///< Motor parameter data structure.
+    UserInterface& mUi;        ///< User interface and telemetry interface.
 
     // Sensor Architecture
-    OpenLoopSensor mOpenLoopSensor;
-    EncoderSensor mEncoderSensor;
-    EmkObserver mEmkObserver;
-    SensorSelector mSensorSelector;
+    OpenLoopSensor mOpenLoopSensor; ///< Open-loop virtual rotor position sensor.
+    EncoderSensor mEncoderSensor;   ///< Encoder-based rotor position sensor.
+    EmkObserver mEmkObserver;       ///< Sensorless back-EMF sliding mode observer.
+    SensorSelector mSensorSelector; ///< Rotor position sensor selector.
 
     // Controllers & Math
-    FOC mFoc;
-    Transforms mTransforms;
-    FaultManager mFaultManager;
-    RampGenerator mSpeedRamp;
-    AutoSetup mAutoSetup;
+    FOC mFoc;                   ///< Field-Oriented Control implementation.
+    Transforms mTransforms;     ///< Clarke/Park mathematical transforms.
+    FaultManager mFaultManager; ///< Safety fault manager.
+    RampGenerator mSpeedRamp;   ///< Speed reference ramp generator.
+    AutoSetup mAutoSetup;       ///< Automatic tuning sequencer.
 
     // Control Variables
-    float mTargetOmega_rad_Hz{0.0f};
-    float mOmegaRef_rad_Hz{0.0f};
-    float mIdRef_A{0.0f};
-    float mIqRef_A{0.0f};
-    float mId_A{0.0f};
-    float mIq_A{0.0f};
-    float mIalpha_A{0.0f};
-    float mIbeta_A{0.0f};
-    float mUd_V{0.0f};
-    float mUq_V{0.0f};
-    float mUalpha_V{0.0f};
-    float mUbeta_V{0.0f};
-    float mIsAbs_A{0.0f};
-    float mAcceleration_rad_Hz2{0.0f};
-    float mUdcBus_V{0.0f};
-    float mTemp_C{0.0f};
-    float mUsLimit_V{};
-    uint8_t mIsErrorrState{};
-    // State Variables
-    bool mMotorEnabled_bool{false};
-    bool mCmdMotorEnabled_bool{false};
-    AutoSetupReferences mAutoSetupRefs;
+    float mTargetOmega_rad_Hz{0.0f};      ///< Target rotor electrical speed in rad/s.
+    float mOmegaRef_rad_Hz{0.0f};         ///< Ramped reference rotor electrical speed in rad/s.
+    float mIdRef_A{0.0f};                 ///< Reference d-axis current in Amperes.
+    float mIqRef_A{0.0f};                 ///< Reference q-axis current in Amperes.
+    float mId_A{0.0f};                    ///< Measured d-axis current in Amperes.
+    float mIq_A{0.0f};                    ///< Measured q-axis current in Amperes.
+    float mIalpha_A{0.0f};                ///< Measured current in alpha coordinate in Amperes.
+    float mIbeta_A{0.0f};                 ///< Measured current in beta coordinate in Amperes.
+    float mUd_V{0.0f};                    ///< Direct axis voltage reference in Volts.
+    float mUq_V{0.0f};                    ///< Quadrature axis voltage reference in Volts.
+    float mUalpha_V{0.0f};                ///< Alpha axis voltage reference in Volts.
+    float mUbeta_V{0.0f};                 ///< Beta axis voltage reference in Volts.
+    float mIsAbs_A{0.0f};                 ///< Absolute stator current limit in Amperes.
+    float mAcceleration_rad_Hz2{0.0f};    ///< Acceleration rate in electrical rad/s^2.
+    float mUdcBus_V{0.0f};                ///< Measured DC link bus voltage in Volts.
+    float mTemp_C{0.0f};                  ///< Measured power stage temperature in Celsius.
+    float mUsLimit_V{};                   ///< Stator voltage limit vector length in Volts.
+    uint8_t mIsErrorrState{};             ///< Active fault code.
 
-    ControlDriveHardware mDsmHardware;
-    DriveStateMachine mDsm;
-    ModeManager mModeManager;
+    // State Variables
+    bool mMotorEnabled_bool{false};       ///< True if motor control loop is actively modulating PWM.
+    bool mCmdMotorEnabled_bool{false};    ///< Requested motor enable state from host.
+    AutoSetupReferences mAutoSetupRefs;   ///< References for the auto-setup calibration routine.
+
+    ControlDriveHardware mDsmHardware;    ///< Drive State Machine hardware interface adapter.
+    DriveStateMachine mDsm;               ///< Drive State Machine instance.
+    ModeManager mModeManager;             ///< Control mode manager instance.
 
     // Counters
-    uint8_t mTelemetryCounter_count{0};
-    uint32_t mSpeedLoopCounter_count{0};
-    const uint32_t mSpeedLoopDivider_count{10};
+    uint8_t mTelemetryCounter_count{0};    ///< Telemetry loop divider count.
+    uint32_t mSpeedLoopCounter_count{0};   ///< Speed loop downsampling count.
+    const uint32_t mSpeedLoopDivider_count{10}; ///< Speed loop downsampling divider.
 };
 
 // Inline definitions for ControlDriveHardware methods
+
+/**
+ * @brief Construct a new ControlDriveHardware adapter.
+ * @param parent Reference to the parent Control class instance.
+ */
 inline ControlDriveHardware::ControlDriveHardware(Control& parent) : mParent(parent)
 {
 }
 
+/**
+ * @brief Implementation to enable the physical gate driver.
+ */
 inline void ControlDriveHardware::enableGateDriver()
 {
     mParent.mGateEnable.set_enable(true);
 }
 
+/**
+ * @brief Implementation to disable the physical gate driver.
+ */
 inline void ControlDriveHardware::disableGateDriver()
 {
     mParent.mGateEnable.set_enable(false);
 }
 
+/**
+ * @brief Implementation to enable PWM outputs (unused on this platform).
+ */
 inline void ControlDriveHardware::enablePwm()
 {
 }
+
+/**
+ * @brief Implementation to disable PWM outputs (unused on this platform).
+ */
 inline void ControlDriveHardware::disablePwm()
 {
 }
 
+/**
+ * @brief Implementation to reset internal control states.
+ */
 inline void ControlDriveHardware::resetControllers()
 {
     mParent.mFoc.resetFoc();
     mParent.mAutoSetup.reset();
 }
 
+/**
+ * @brief Implementation to query if the hardware is free of faults.
+ * @return true if hardware is ready, false if faulted.
+ */
 inline bool ControlDriveHardware::isHardwareReady() const
 {
     return !mParent.mFaultManager.isFaulted();
 }
 
+/**
+ * @brief Implementation to query if the gate driver is ready (always true on this hardware).
+ * @return true.
+ */
 inline bool ControlDriveHardware::isGateDriverReady() const
 {
     return true;
 }
 
+/**
+ * @brief Implementation to query if there is any active hardware fault.
+ * @return true if faulted, false otherwise.
+ */
 inline bool ControlDriveHardware::hasActiveFault() const
 {
     return mParent.mFaultManager.isFaulted();

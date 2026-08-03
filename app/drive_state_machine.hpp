@@ -1,6 +1,11 @@
 #pragma once
 #include <cstdint>
 
+/**
+ * @file drive_state_machine.hpp
+ * @brief Event-driven, deterministic Drive State Machine for lifecycle and safety.
+ */
+
 namespace app
 {
 
@@ -23,18 +28,52 @@ enum class DriveState : uint8_t
 class IDriveHardware
 {
   public:
+    /**
+     * @brief Virtual destructor for IDriveHardware.
+     */
     virtual ~IDriveHardware() = default;
 
-    // Commands to control hardware states
+    /**
+     * @brief Enable the gate driver hardware.
+     */
     virtual void enableGateDriver() = 0;
+
+    /**
+     * @brief Disable the gate driver hardware.
+     */
     virtual void disableGateDriver() = 0;
+
+    /**
+     * @brief Enable PWM outputs.
+     */
     virtual void enablePwm() = 0;
+
+    /**
+     * @brief Disable PWM outputs.
+     */
     virtual void disablePwm() = 0;
+
+    /**
+     * @brief Reset internal controllers.
+     */
     virtual void resetControllers() = 0;
 
-    // Queries to check hardware status
+    /**
+     * @brief Check if the underlying hardware is ready.
+     * @return true if hardware is ready, false otherwise.
+     */
     virtual bool isHardwareReady() const = 0;
+
+    /**
+     * @brief Check if the gate driver is powered on and ready.
+     * @return true if the gate driver is ready, false otherwise.
+     */
     virtual bool isGateDriverReady() const = 0;
+
+    /**
+     * @brief Check if any active hardware faults exist.
+     * @return true if active hardware faults exist, false otherwise.
+     */
     virtual bool hasActiveFault() const = 0;
 };
 
@@ -44,6 +83,10 @@ class IDriveHardware
 class DriveStateMachine
 {
   public:
+    /**
+     * @brief Construct a new Drive State Machine object.
+     * @param hardware Reference to the drive hardware abstraction layer.
+     */
     explicit DriveStateMachine(IDriveHardware& hardware)
         : mHardware(hardware), mState(DriveState::PowerOff)
     {
@@ -79,7 +122,7 @@ class DriveStateMachine
         {
             case DriveState::PowerOff:
                 break;
-
+ 
             case DriveState::Init:
                 if (mHardware.isHardwareReady())
                 {
@@ -158,50 +201,74 @@ class DriveStateMachine
 
     /**
      * @brief Get the current drive state.
+     * @return The current DriveState.
      */
     DriveState getState() const { return mState; }
 
     /**
      * @brief Check if the inverter is allowed to produce voltage.
+     * @return true if the state is Enabled, false otherwise.
      */
     bool isEnabled() const { return mState == DriveState::Enabled; }
 
   private:
+    /**
+     * @brief Actions executed upon entering the PowerOff state.
+     */
     void onEnterPowerOff()
     {
         mHardware.disablePwm();
         mHardware.disableGateDriver();
     }
 
+    /**
+     * @brief Actions executed upon entering the Init state.
+     */
     void onEnterInit()
     {
         mHardware.disablePwm();
         mHardware.disableGateDriver();
     }
 
+    /**
+     * @brief Actions executed upon entering the Ready state.
+     */
     void onEnterReady()
     {
         mHardware.disablePwm();
         mHardware.disableGateDriver();
     }
 
+    /**
+     * @brief Actions executed upon entering the Enabling state.
+     */
     void onEnterEnabling()
     {
         mHardware.enableGateDriver();
     }
 
+    /**
+     * @brief Actions executed upon entering the Enabled state.
+     */
     void onEnterEnabled()
     {
         mHardware.resetControllers();
         mHardware.enablePwm();
     }
 
+    /**
+     * @brief Actions executed upon entering the Fault state.
+     */
     void onEnterFault()
     {
         mHardware.disablePwm();
         mHardware.disableGateDriver();
     }
 
+    /**
+     * @brief Actions executed upon exiting the Enabling state.
+     * @param nextState The state being transitioned to.
+     */
     void onExitEnabling(DriveState nextState)
     {
         if (nextState != DriveState::Enabled)
@@ -211,6 +278,10 @@ class DriveStateMachine
         }
     }
 
+    /**
+     * @brief Actions executed upon exiting the Enabled state.
+     * @param nextState The state being transitioned to.
+     */
     void onExitEnabled(DriveState nextState)
     {
         if (nextState != DriveState::Enabling)
@@ -220,6 +291,10 @@ class DriveStateMachine
         }
     }
 
+    /**
+     * @brief Transition to a new state and execute entry/exit actions.
+     * @param newState The state to transition to.
+     */
     void transitionTo(DriveState newState)
     {
         if (mState == newState)
@@ -264,8 +339,8 @@ class DriveStateMachine
         }
     }
 
-    IDriveHardware& mHardware;
-    DriveState mState;
+    IDriveHardware& mHardware; ///< Reference to the drive hardware abstraction layer.
+    DriveState mState;         ///< The current state of the drive state machine.
 };
 
 } // namespace app
