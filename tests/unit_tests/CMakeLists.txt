@@ -3,6 +3,8 @@ add_executable(unit_tests
     dq_limiter_test.cpp
     pi_controller_test.cpp
     svm_test.cpp
+    drive_state_machine_test.cpp
+    mode_manager_test.cpp
 )
 
 target_link_libraries(unit_tests PRIVATE
