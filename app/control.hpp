@@ -73,8 +73,8 @@ class Control
                          motor_params.encoderOffset_ticks),
           mEmkObserver(pwmPeriod_s, motor_params),
           mSensorSelector(mOpenLoopSensor, mEncoderSensor, mEmkObserver),
-          mFoc(motor_params, pwmPeriod_s), mFaultManager(), mSpeedRamp(pwmPeriod_s), mAutoSetup(mMotorParams, pwmPeriod_s),
-          mDsmHardware(*this), mDsm(mDsmHardware),
+          mFoc(motor_params, pwmPeriod_s), mFaultManager(), mSpeedRamp(pwmPeriod_s),
+          mAutoSetup(mMotorParams, pwmPeriod_s), mDsmHardware(*this), mDsm(mDsmHardware),
           mModeManager(mFoc, mAutoSetup)
     {
         mUdcBus_V = mAdcSense.read_bus_voltage();
@@ -321,7 +321,8 @@ class Control
 
     /**
      * @brief Main control interrupt service routine.
-     *        Executes speed ramp, reads sensors, updates state machine, runs FOC loops, and drives the PWM inverter.
+     *        Executes speed ramp, reads sensors, updates state machine, runs FOC loops, and drives
+     * the PWM inverter.
      */
     void run_isr()
     {
@@ -341,20 +342,20 @@ class Control
 
         std::tie(mId_A, mIq_A) = mTransforms.park(mIalpha_A, mIbeta_A, activeTheta_rad);
 
-        ModeManager::OutputRefs modeRefs =
-            mModeManager.step({.currents = {.id_A = mId_A, .iq_A = mIq_A},
-                               .voltages = {.ud_V = mUd_V, .uq_V = mUq_V},
-                               .sensors = {.activeOmega_rad_Hz = activeOmega_rad_Hz,
-                                           .thetaOpenLoop_rad = mOpenLoopSensor.getTheta_rad(),
-                                           .thetaEncoder_rad = mEncoderSensor.getTheta_rad()},
-                               .reference = {.targetCurrent_A = mIsAbs_A,
-                                             .targetSpeed_rpm = mUi.targetSpeed_rpm,
-                                             .acceleration_rpm_s = mUi.mAcceleration_rpm_s,
-                                             .omegaRef_rad_Hz = mOmegaRef_rad_Hz,
-                                             .polePairs = static_cast<float>(mMotorParams.polePairs)},
-                               .flags = {.isClosedLoop = (mSensorSelector.getSelectedType() !=
-                                                          SensorSelector::SensorType::OpenLoop),
-                                         .isDriveEnabled = mMotorEnabled_bool}});
+        ModeManager::OutputRefs modeRefs = mModeManager.step(
+            {.currents = {.id_A = mId_A, .iq_A = mIq_A},
+             .voltages = {.ud_V = mUd_V, .uq_V = mUq_V},
+             .sensors = {.activeOmega_rad_Hz = activeOmega_rad_Hz,
+                         .thetaOpenLoop_rad = mOpenLoopSensor.getTheta_rad(),
+                         .thetaEncoder_rad = mEncoderSensor.getTheta_rad()},
+             .reference = {.targetCurrent_A = mIsAbs_A,
+                           .targetSpeed_rpm = mUi.targetSpeed_rpm,
+                           .acceleration_rpm_s = mUi.mAcceleration_rpm_s,
+                           .omegaRef_rad_Hz = mOmegaRef_rad_Hz,
+                           .polePairs = static_cast<float>(mMotorParams.polePairs)},
+             .flags = {.isClosedLoop = (mSensorSelector.getSelectedType() !=
+                                        SensorSelector::SensorType::OpenLoop),
+                       .isDriveEnabled = mMotorEnabled_bool}});
 
         mIdRef_A = modeRefs.idRef_A;
         mIqRef_A = modeRefs.iqRef_A;
@@ -388,6 +389,8 @@ class Control
 
         std::tie(mUalpha_V, mUbeta_V) = mTransforms.inversePark(mUd_V, mUq_V, activeTheta_rad);
         auto [Va_V, Vb_V, Vc_V] = mTransforms.inverseClarke(mUalpha_V, mUbeta_V);
+
+        auto [Va_svm_V, Vb_svm_V, Vc_svm_V] = spaceVectorModulation(Va_V, Vb_V, Vc_V);
 
         mInverter.set_phase_voltages(Va_V, Vb_V, Vc_V, mUdcBus_V, mMotorEnabled_bool);
 
@@ -591,11 +594,11 @@ class Control
         writeUserTelemetry();
     }
 
-    IADC& mAdcSense;           ///< ADC sensing interface.
-    IInverter& mInverter;      ///< Power stage inverter interface.
-    IEnableOutput& mGateEnable;///< Gate driver enable interface.
-    MotorParams& mMotorParams; ///< Motor parameter data structure.
-    UserInterface& mUi;        ///< User interface and telemetry interface.
+    IADC& mAdcSense;            ///< ADC sensing interface.
+    IInverter& mInverter;       ///< Power stage inverter interface.
+    IEnableOutput& mGateEnable; ///< Gate driver enable interface.
+    MotorParams& mMotorParams;  ///< Motor parameter data structure.
+    UserInterface& mUi;         ///< User interface and telemetry interface.
 
     // Sensor Architecture
     OpenLoopSensor mOpenLoopSensor; ///< Open-loop virtual rotor position sensor.
@@ -611,37 +614,37 @@ class Control
     AutoSetup mAutoSetup;       ///< Automatic tuning sequencer.
 
     // Control Variables
-    float mTargetOmega_rad_Hz{0.0f};      ///< Target rotor electrical speed in rad/s.
-    float mOmegaRef_rad_Hz{0.0f};         ///< Ramped reference rotor electrical speed in rad/s.
-    float mIdRef_A{0.0f};                 ///< Reference d-axis current in Amperes.
-    float mIqRef_A{0.0f};                 ///< Reference q-axis current in Amperes.
-    float mId_A{0.0f};                    ///< Measured d-axis current in Amperes.
-    float mIq_A{0.0f};                    ///< Measured q-axis current in Amperes.
-    float mIalpha_A{0.0f};                ///< Measured current in alpha coordinate in Amperes.
-    float mIbeta_A{0.0f};                 ///< Measured current in beta coordinate in Amperes.
-    float mUd_V{0.0f};                    ///< Direct axis voltage reference in Volts.
-    float mUq_V{0.0f};                    ///< Quadrature axis voltage reference in Volts.
-    float mUalpha_V{0.0f};                ///< Alpha axis voltage reference in Volts.
-    float mUbeta_V{0.0f};                 ///< Beta axis voltage reference in Volts.
-    float mIsAbs_A{0.0f};                 ///< Absolute stator current limit in Amperes.
-    float mAcceleration_rad_Hz2{0.0f};    ///< Acceleration rate in electrical rad/s^2.
-    float mUdcBus_V{0.0f};                ///< Measured DC link bus voltage in Volts.
-    float mTemp_C{0.0f};                  ///< Measured power stage temperature in Celsius.
-    float mUsLimit_V{};                   ///< Stator voltage limit vector length in Volts.
-    uint8_t mIsErrorrState{};             ///< Active fault code.
+    float mTargetOmega_rad_Hz{0.0f};   ///< Target rotor electrical speed in rad/s.
+    float mOmegaRef_rad_Hz{0.0f};      ///< Ramped reference rotor electrical speed in rad/s.
+    float mIdRef_A{0.0f};              ///< Reference d-axis current in Amperes.
+    float mIqRef_A{0.0f};              ///< Reference q-axis current in Amperes.
+    float mId_A{0.0f};                 ///< Measured d-axis current in Amperes.
+    float mIq_A{0.0f};                 ///< Measured q-axis current in Amperes.
+    float mIalpha_A{0.0f};             ///< Measured current in alpha coordinate in Amperes.
+    float mIbeta_A{0.0f};              ///< Measured current in beta coordinate in Amperes.
+    float mUd_V{0.0f};                 ///< Direct axis voltage reference in Volts.
+    float mUq_V{0.0f};                 ///< Quadrature axis voltage reference in Volts.
+    float mUalpha_V{0.0f};             ///< Alpha axis voltage reference in Volts.
+    float mUbeta_V{0.0f};              ///< Beta axis voltage reference in Volts.
+    float mIsAbs_A{0.0f};              ///< Absolute stator current limit in Amperes.
+    float mAcceleration_rad_Hz2{0.0f}; ///< Acceleration rate in electrical rad/s^2.
+    float mUdcBus_V{0.0f};             ///< Measured DC link bus voltage in Volts.
+    float mTemp_C{0.0f};               ///< Measured power stage temperature in Celsius.
+    float mUsLimit_V{};                ///< Stator voltage limit vector length in Volts.
+    uint8_t mIsErrorrState{};          ///< Active fault code.
 
     // State Variables
-    bool mMotorEnabled_bool{false};       ///< True if motor control loop is actively modulating PWM.
-    bool mCmdMotorEnabled_bool{false};    ///< Requested motor enable state from host.
-    AutoSetupReferences mAutoSetupRefs;   ///< References for the auto-setup calibration routine.
+    bool mMotorEnabled_bool{false};     ///< True if motor control loop is actively modulating PWM.
+    bool mCmdMotorEnabled_bool{false};  ///< Requested motor enable state from host.
+    AutoSetupReferences mAutoSetupRefs; ///< References for the auto-setup calibration routine.
 
-    ControlDriveHardware mDsmHardware;    ///< Drive State Machine hardware interface adapter.
-    DriveStateMachine mDsm;               ///< Drive State Machine instance.
-    ModeManager mModeManager;             ///< Control mode manager instance.
+    ControlDriveHardware mDsmHardware; ///< Drive State Machine hardware interface adapter.
+    DriveStateMachine mDsm;            ///< Drive State Machine instance.
+    ModeManager mModeManager;          ///< Control mode manager instance.
 
     // Counters
-    uint8_t mTelemetryCounter_count{0};    ///< Telemetry loop divider count.
-    uint32_t mSpeedLoopCounter_count{0};   ///< Speed loop downsampling count.
+    uint8_t mTelemetryCounter_count{0};         ///< Telemetry loop divider count.
+    uint32_t mSpeedLoopCounter_count{0};        ///< Speed loop downsampling count.
     const uint32_t mSpeedLoopDivider_count{10}; ///< Speed loop downsampling divider.
 };
 
