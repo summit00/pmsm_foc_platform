@@ -65,12 +65,6 @@ class CsvLogger
         record("foc.OpenLoopOmega_rad_Hz", control.getOpenLoopOmega_rad_Hz());
         record("foc.EncoderTheta_rad", control.getEncoderTheta_rad());
         record("foc.EncoderOmega_rad_Hz", control.getEncoderOmega_rad_Hz());
-        record("foc.EmkObserverTheta_rad", control.getEmkObserverTheta_rad());
-        record("foc.EmkObserverOmega_rad_Hz", control.getEmkObserverOmega_rad_Hz());
-        record("foc.ObserverError_deg",
-               math::compute_angle_error(control.getEmkObserverTheta_rad(),
-                                         control.getEncoderTheta_rad()) *
-                   (180.0f / std::numbers::pi_v<float>));
         record("foc.AutoSetupState", static_cast<float>(control.getAutoSetupState()));
         record("foc.EncoderOffsetTicks", static_cast<float>(control.getEncoderOffset_ticks()));
 

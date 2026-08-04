@@ -11,12 +11,11 @@ class SensorSelector
     enum class SensorType
     {
         OpenLoop,
-        Encoder,
-        EmkObserver
+        Encoder
     };
 
-    SensorSelector(ISensor& openLoopSensor, ISensor& encoderSensor, ISensor& emkObserver)
-        : mOpenLoopSensor(openLoopSensor), mEncoderSensor(encoderSensor), mEmkObserver(emkObserver),
+    SensorSelector(ISensor& openLoopSensor, ISensor& encoderSensor)
+        : mOpenLoopSensor(openLoopSensor), mEncoderSensor(encoderSensor),
           mActiveSensor(&openLoopSensor)
     {
     }
@@ -32,9 +31,6 @@ class SensorSelector
             case SensorType::Encoder:
                 mActiveSensor = &mEncoderSensor;
                 break;
-            case SensorType::EmkObserver:
-                mActiveSensor = &mEmkObserver;
-                break;
         }
     }
 
@@ -42,7 +38,6 @@ class SensorSelector
     {
         mOpenLoopSensor.update();
         mEncoderSensor.update();
-        mEmkObserver.update();
     }
 
     void updateActiveSensor()
@@ -71,7 +66,6 @@ class SensorSelector
   private:
     ISensor& mOpenLoopSensor;
     ISensor& mEncoderSensor;
-    ISensor& mEmkObserver;
 
     ISensor* mActiveSensor{nullptr};
     SensorType mSelectedType{SensorType::OpenLoop};

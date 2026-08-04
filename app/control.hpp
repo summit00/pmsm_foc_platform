@@ -3,7 +3,6 @@
 #include "QEI_sensor.hpp"
 #include "auto_setup.hpp"
 #include "control_drive_hardware.hpp"
-#include "emk_observer.hpp"
 #include "fault_manager.hpp"
 #include "foc.hpp"
 #include "interfaces.hpp"
@@ -71,8 +70,7 @@ class Control
                          motor_params.polePairs,
                          static_cast<float>(motor_params.encoderTicks),
                          motor_params.encoderOffset_ticks),
-          mEmkObserver(pwmPeriod_s, motor_params),
-          mSensorSelector(mOpenLoopSensor, mEncoderSensor, mEmkObserver),
+          mSensorSelector(mOpenLoopSensor, mEncoderSensor),
           mFoc(motor_params, pwmPeriod_s), mFaultManager(), mSpeedRamp(pwmPeriod_s),
           mAutoSetup(mMotorParams, pwmPeriod_s), mDsmHardware(*this), mDsm(mDsmHardware),
           mModeManager(mFoc, mAutoSetup)
@@ -247,23 +245,6 @@ class Control
         return mEncoderSensor.getOmega_rad_Hz();
     }
 
-    /**
-     * @brief Get the back-EMF observer-estimated rotor angle.
-     * @return Observer rotor angle in electrical radians.
-     */
-    float getEmkObserverTheta_rad() const
-    {
-        return mEmkObserver.getTheta_rad();
-    }
-
-    /**
-     * @brief Get the back-EMF observer-estimated electrical rotor speed.
-     * @return Observer speed in electrical rad/s.
-     */
-    float getEmkObserverOmega_rad_Hz() const
-    {
-        return mEmkObserver.getOmega_rad_Hz();
-    }
 
     /**
      * @brief Get the motor stator winding resistance.
@@ -334,7 +315,6 @@ class Control
         handleEnableTransition();
 
         std::tie(mIalpha_A, mIbeta_A) = mTransforms.clarke(currents.ia_A, currents.ic_A);
-        setSensorlessData();
 
         mSensorSelector.updateAllSensors();
         float activeTheta_rad = mSensorSelector.getActiveTheta_rad();
@@ -398,17 +378,6 @@ class Control
     }
 
   private:
-    /**
-     * @brief Set sensorless observer data with current FOC alpha/beta parameters.
-     */
-    void setSensorlessData()
-    {
-        mMotorParams.Ialpha_A = mIalpha_A;
-        mMotorParams.Ibeta_A = mIbeta_A;
-        mMotorParams.Ualpha_V = mUalpha_V;
-        mMotorParams.Ubeta_V = mUbeta_V;
-    }
-
     /**
      * @brief Process drive state transitions and handle motor enable/disable logic.
      */
@@ -562,13 +531,10 @@ class Control
             (mEncoderSensor.getOmega_rad_Hz() * radHzToRpm) / mMotorParams.polePairs;
         mUi.feedbackSpeed_rpm =
             (mSensorSelector.getActiveOmega_rad_Hz() * radHzToRpm) / mMotorParams.polePairs;
-        mUi.observerSpeed_rpm =
-            (mEmkObserver.getOmega_rad_Hz() * radHzToRpm) / mMotorParams.polePairs;
+        mUi.observerSpeed_rpm = 0.0f;
         mUi.encoderAngle_deg = mEncoderSensor.getTheta_rad() * radToDeg;
-        mUi.observerAngle_deg = mEmkObserver.getTheta_rad() * radToDeg;
-        mUi.angleError_deg =
-            math::compute_angle_error(mEncoderSensor.getTheta_rad(), mEmkObserver.getTheta_rad()) *
-            radToDeg;
+        mUi.observerAngle_deg = 0.0f;
+        mUi.angleError_deg = 0.0f;
 
         mUi.Id_A = mId_A;
         mUi.Iq_A = mIq_A;
@@ -603,7 +569,6 @@ class Control
     // Sensor Architecture
     OpenLoopSensor mOpenLoopSensor; ///< Open-loop virtual rotor position sensor.
     EncoderSensor mEncoderSensor;   ///< Encoder-based rotor position sensor.
-    EmkObserver mEmkObserver;       ///< Sensorless back-EMF sliding mode observer.
     SensorSelector mSensorSelector; ///< Rotor position sensor selector.
 
     // Controllers & Math
