@@ -14,6 +14,7 @@
 #include "svm.hpp"
 #include "transform.hpp"
 #include "user_interface.hpp"
+#include "vf_control.hpp"
 
 #include <cstdint>
 #include <numbers>
@@ -73,7 +74,8 @@ class Control
           mSensorSelector(mOpenLoopSensor, mEncoderSensor),
           mFoc(motor_params, pwmPeriod_s), mFaultManager(), mSpeedRamp(pwmPeriod_s),
           mAutoSetup(mMotorParams, pwmPeriod_s), mDsmHardware(*this), mDsm(mDsmHardware),
-          mModeManager(mFoc, mAutoSetup)
+          mModeManager(mFoc, mAutoSetup),
+          mVfControl(motor_params.flux_pm_Wb, motor_params.v_boost)
     {
         mUdcBus_V = mAdcSense.read_bus_voltage();
         mTemp_C = mAdcSense.read_temperature_celsius();
@@ -132,6 +134,8 @@ class Control
                 return 3;
             case ControlMode::Position:
                 return 4;
+            case ControlMode::VfControl:
+                return 5;
             default:
                 return 0;
         }
@@ -351,24 +355,35 @@ class Control
             mSensorSelector.selectSensor(modeRefs.requestedSensor);
         }
 
-        if (!bypassCurrentControl)
+        float Va_V = 0.0f;
+        float Vb_V = 0.0f;
+        float Vc_V = 0.0f;
+
+        if (mModeManager.getMode() == ControlMode::VfControl)
         {
-            std::tie(mUd_V, mUq_V) = mFoc.runCurrentControl(mIdRef_A,
-                                                            mIqRef_A,
-                                                            mId_A,
-                                                            mIq_A,
-                                                            activeOmega_rad_Hz,
-                                                            mUsLimit_V,
-                                                            mMotorEnabled_bool);
+            std::tie(mUd_V, mUq_V) = mVfControl.update(mOmegaRef_rad_Hz);
         }
         else
         {
-            mUd_V = injectedUd_V;
-            mUq_V = injectedUq_V;
+            if (!bypassCurrentControl)
+            {
+                std::tie(mUd_V, mUq_V) = mFoc.runCurrentControl(mIdRef_A,
+                                                                mIqRef_A,
+                                                                mId_A,
+                                                                mIq_A,
+                                                                activeOmega_rad_Hz,
+                                                                mUsLimit_V,
+                                                                mMotorEnabled_bool);
+            }
+            else
+            {
+                mUd_V = injectedUd_V;
+                mUq_V = injectedUq_V;
+            }
         }
 
         std::tie(mUalpha_V, mUbeta_V) = mTransforms.inversePark(mUd_V, mUq_V, activeTheta_rad);
-        auto [Va_V, Vb_V, Vc_V] = mTransforms.inverseClarke(mUalpha_V, mUbeta_V);
+        std::tie(Va_V, Vb_V, Vc_V) = mTransforms.inverseClarke(mUalpha_V, mUbeta_V);
 
         auto [Va_svm_V, Vb_svm_V, Vc_svm_V] = spaceVectorModulation(Va_V, Vb_V, Vc_V);
 
@@ -432,7 +447,8 @@ class Control
     {
         if (mMotorEnabled_bool)
         {
-            if (mModeManager.getMode() == ControlMode::Velocity)
+            if (mModeManager.getMode() == ControlMode::Velocity ||
+                mModeManager.getMode() == ControlMode::VfControl)
             {
                 mOmegaRef_rad_Hz = mSpeedRamp.update(mTargetOmega_rad_Hz, mAcceleration_rad_Hz2);
             }
@@ -491,6 +507,10 @@ class Control
             case 4: // POSITION
                 targetMode = ControlMode::Position;
                 targetSensor = SensorSelector::SensorType::Encoder;
+                break;
+            case 5: // VfControl
+                targetMode = ControlMode::VfControl;
+                targetSensor = SensorSelector::SensorType::OpenLoop;
                 break;
             default:
                 targetMode = ControlMode::Velocity;
@@ -606,6 +626,7 @@ class Control
     ControlDriveHardware mDsmHardware; ///< Drive State Machine hardware interface adapter.
     DriveStateMachine mDsm;            ///< Drive State Machine instance.
     ModeManager mModeManager;          ///< Control mode manager instance.
+    VfControl mVfControl;              ///< VfControl instance.
 
     // Counters
     uint8_t mTelemetryCounter_count{0};         ///< Telemetry loop divider count.

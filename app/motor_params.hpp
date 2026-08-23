@@ -17,6 +17,7 @@ struct MotorParams
     float Ubeta_V = 0.0f;
     float Ialpha_A = 0.0f;
     float Ibeta_A = 0.0f;
+    float v_boost = 1.0f; ///< Voltage boost at 0 Hz to overcome winding resistance (V)
 };
 
 } // namespace app

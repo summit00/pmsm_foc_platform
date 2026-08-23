@@ -1,10 +1,10 @@
 #pragma once
+#include "auto_setup.hpp"
+#include "foc.hpp"
+#include "math.hpp"
+#include "sensor_selector.hpp"
 #include <cstdint>
 #include <tuple>
-#include "foc.hpp"
-#include "auto_setup.hpp"
-#include "sensor_selector.hpp"
-#include "math.hpp"
 
 /**
  * @file mode_manager.hpp
@@ -19,11 +19,12 @@ namespace app
  */
 enum class ControlMode : uint8_t
 {
-    Idle = 0,      ///< Inverter outputs are disabled, no active control.
-    Autosetup,     ///< Motor commissioning and calibration routine.
-    Velocity,      ///< Closed or open loop speed control mode.
-    Torque,        ///< Quadrature current (torque) control mode.
-    Position       ///< Closed loop rotor position control mode.
+    Idle = 0,  ///< Inverter outputs are disabled, no active control.
+    Autosetup, ///< Motor commissioning and calibration routine.
+    Velocity,  ///< Closed or open loop speed control mode.
+    Torque,    ///< Quadrature current (torque) control mode.
+    Position,  ///< Closed loop rotor position control mode.
+    VfControl  ///< V/f control.
 };
 
 /**
@@ -70,11 +71,12 @@ class ModeManager
          */
         struct Reference
         {
-            float targetCurrent_A = 0.0f;      ///< Target current magnitude or torque reference current in Amperes.
-            float targetSpeed_rpm = 0.0f;      ///< Target rotor speed in mechanical RPM.
-            float acceleration_rpm_s = 0.0f;   ///< Target acceleration rate in RPM/s.
-            float omegaRef_rad_Hz = 0.0f;      ///< Target rotor speed in electrical rad/s.
-            float polePairs = 0.0f;            ///< Number of motor pole pairs.
+            float targetCurrent_A =
+                0.0f; ///< Target current magnitude or torque reference current in Amperes.
+            float targetSpeed_rpm = 0.0f;    ///< Target rotor speed in mechanical RPM.
+            float acceleration_rpm_s = 0.0f; ///< Target acceleration rate in RPM/s.
+            float omegaRef_rad_Hz = 0.0f;    ///< Target rotor speed in electrical rad/s.
+            float polePairs = 0.0f;          ///< Number of motor pole pairs.
         } reference;
 
         /**
@@ -82,8 +84,9 @@ class ModeManager
          */
         struct Flags
         {
-            bool isClosedLoop = false;   ///< True if running in closed loop, false otherwise.
-            bool isDriveEnabled = false; ///< True if the drive power stage is enabled, false otherwise.
+            bool isClosedLoop = false; ///< True if running in closed loop, false otherwise.
+            bool isDriveEnabled =
+                false; ///< True if the drive power stage is enabled, false otherwise.
         } flags;
     };
 
@@ -92,13 +95,16 @@ class ModeManager
      */
     struct OutputRefs
     {
-        float idRef_A = 0.0f;              ///< Reference direct axis current in Amperes.
-        float iqRef_A = 0.0f;              ///< Reference quadrature axis current in Amperes.
-        float injectedUd_V = 0.0f;         ///< Injected direct axis voltage in Volts (autosetup/bypass).
-        float injectedUq_V = 0.0f;         ///< Injected quadrature axis voltage in Volts (autosetup/bypass).
-        bool bypassCurrentControl = false; ///< True to bypass the FOC current controllers and apply voltage directly.
-        float omegaRef_rad_Hz = 0.0f;      ///< Reference rotor speed in electrical rad/s.
-        SensorSelector::SensorType requestedSensor = SensorSelector::SensorType::OpenLoop; ///< Selected sensor source.
+        float idRef_A = 0.0f;      ///< Reference direct axis current in Amperes.
+        float iqRef_A = 0.0f;      ///< Reference quadrature axis current in Amperes.
+        float injectedUd_V = 0.0f; ///< Injected direct axis voltage in Volts (autosetup/bypass).
+        float injectedUq_V =
+            0.0f; ///< Injected quadrature axis voltage in Volts (autosetup/bypass).
+        bool bypassCurrentControl =
+            false; ///< True to bypass the FOC current controllers and apply voltage directly.
+        float omegaRef_rad_Hz = 0.0f; ///< Reference rotor speed in electrical rad/s.
+        SensorSelector::SensorType requestedSensor =
+            SensorSelector::SensorType::OpenLoop; ///< Selected sensor source.
     };
 
     /**
@@ -106,8 +112,7 @@ class ModeManager
      * @param foc Reference to the FOC controller.
      * @param autoSetup Reference to the AutoSetup utility.
      */
-    explicit ModeManager(FOC& foc, AutoSetup& autoSetup)
-        : mFoc(foc), mAutoSetup(autoSetup)
+    explicit ModeManager(FOC& foc, AutoSetup& autoSetup) : mFoc(foc), mAutoSetup(autoSetup)
     {
     }
 
@@ -131,7 +136,10 @@ class ModeManager
      * @brief Get the current control mode.
      * @return The active ControlMode.
      */
-    ControlMode getMode() const { return mMode; }
+    ControlMode getMode() const
+    {
+        return mMode;
+    }
 
     /**
      * @brief Run a single execution step of the mode manager.
@@ -168,6 +176,10 @@ class ModeManager
             case ControlMode::Position:
                 runPositionStep(ctx, out);
                 break;
+
+            case ControlMode::VfControl:
+                runVfControlStep(ctx, out);
+                break;
         }
 
         return out;
@@ -187,8 +199,12 @@ class ModeManager
             mFoc.setCurrentControlGainsManual(0.5f, 0.01f);
         }
 
-        auto refs = mAutoSetup.step(
-            ctx.currents.id_A, ctx.currents.iq_A, ctx.voltages.ud_V, ctx.voltages.uq_V, ctx.sensors.thetaOpenLoop_rad, ctx.sensors.thetaEncoder_rad);
+        auto refs = mAutoSetup.step(ctx.currents.id_A,
+                                    ctx.currents.iq_A,
+                                    ctx.voltages.ud_V,
+                                    ctx.voltages.uq_V,
+                                    ctx.sensors.thetaOpenLoop_rad,
+                                    ctx.sensors.thetaEncoder_rad);
 
         out.idRef_A = refs.IdRef_A;
         out.iqRef_A = refs.IqRef_A;
@@ -224,8 +240,11 @@ class ModeManager
             if (++mSpeedLoopCounter >= mSpeedLoopDivider)
             {
                 mSpeedLoopCounter = 0;
-                std::tie(mIdRef_A_last, mIqRef_A_last) = mFoc.runSpeedControl(
-                    out.omegaRef_rad_Hz, ctx.sensors.activeOmega_rad_Hz, ctx.reference.targetCurrent_A, ctx.flags.isDriveEnabled);
+                std::tie(mIdRef_A_last, mIqRef_A_last) =
+                    mFoc.runSpeedControl(out.omegaRef_rad_Hz,
+                                         ctx.sensors.activeOmega_rad_Hz,
+                                         ctx.reference.targetCurrent_A,
+                                         ctx.flags.isDriveEnabled);
             }
             out.idRef_A = mIdRef_A_last;
             out.iqRef_A = mIqRef_A_last;
@@ -259,14 +278,28 @@ class ModeManager
         out.requestedSensor = SensorSelector::SensorType::Encoder;
     }
 
-    FOC& mFoc;                  ///< Reference to the field-oriented control instance.
-    AutoSetup& mAutoSetup;      ///< Reference to the automatic calibration instance.
+    /**
+     * @brief Executes a step of the V/f open-loop control mode.
+     * @param ctx Current execution context.
+     * @param out Reference to the output references structure to fill.
+     */
+    void runVfControlStep(const ExecutionContext& ctx, OutputRefs& out)
+    {
+        out.omegaRef_rad_Hz = ctx.reference.omegaRef_rad_Hz;
+        out.idRef_A = 0.0f;
+        out.iqRef_A = 0.0f;
+        out.bypassCurrentControl = true;
+        out.requestedSensor = SensorSelector::SensorType::OpenLoop;
+    }
+
+    FOC& mFoc;             ///< Reference to the field-oriented control instance.
+    AutoSetup& mAutoSetup; ///< Reference to the automatic calibration instance.
 
     ControlMode mMode = ControlMode::Idle; ///< The current active control mode.
     uint32_t mSpeedLoopCounter = 0;        ///< Counter for downsampling the speed controller loop.
     const uint32_t mSpeedLoopDivider = 10; ///< Downsampling divider for the speed loop.
-    float mIdRef_A_last = 0.0f;            ///< The last computed d-axis current reference in Amperes.
-    float mIqRef_A_last = 0.0f;            ///< The last computed q-axis current reference in Amperes.
+    float mIdRef_A_last = 0.0f; ///< The last computed d-axis current reference in Amperes.
+    float mIqRef_A_last = 0.0f; ///< The last computed q-axis current reference in Amperes.
 };
 
 } // namespace app
