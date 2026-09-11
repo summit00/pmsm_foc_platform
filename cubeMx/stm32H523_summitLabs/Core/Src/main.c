@@ -23,6 +23,7 @@
 #include "spi.h"
 #include "tim.h"
 #include "usb.h"
+#include "app_usbx_device.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -98,6 +99,7 @@ int main(void)
   MX_TIM1_Init();
   MX_TIM4_Init();
   MX_USB_PCD_Init();
+  MX_USBX_Device_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
