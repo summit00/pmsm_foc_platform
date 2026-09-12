@@ -41,6 +41,13 @@ def main():
             for entry in data.get("telemetry", []):
                 id_map[entry["id"]] = entry
 
+    print("[+] Selecting telemetry channels (including errorState, temp_C, Udc_V, etc.) ...")
+    # SELECT_MAGIC (0xABCE): Dynamic ID selection (10 x uint16_t + 20 bytes padding = 44 bytes)
+    selected_ids = [1, 2, 3, 4, 7, 8, 20, 21, 22, 0] # 1:Udc, 2:demandSpeed, 3:feedbackSpeed, 4:encoder, 7:Id, 8:Iq, 20:temp, 21:errorState, 22:autoSetup
+    select_frame = struct.pack("<HH10H20s", 0xABCE, 1, *selected_ids, b"\x00" * 20)
+    ser.write(select_frame)
+    time.sleep(0.05)
+
     print("[+] Sending command frame to MCU: Enable=1, TargetSpeed=1500 RPM, Accel=500, IsAbs=2000 mA ...")
     # Command frame: RX_MAGIC (0xABCD), seq, 10 int32 payload values
     # Payload format: [enable, mode, targetSpeed*100, accel*100, isAbs*10, 0, 0, 0, 0, 0]
@@ -52,7 +59,7 @@ def main():
         int(2000.0 * 10),   # Current limit (scaled x10)
         0, 0, 0, 0, 0
     ]
-    cmd_frame = struct.pack("<HH10i", 0xABCD, 1, *payload)
+    cmd_frame = struct.pack("<HH10i", 0xABCD, 2, *payload)
     ser.write(cmd_frame)
 
     print("[+] Listening for Rx Telemetry Stream from MCU (magic 0xDCBA)...")
@@ -97,7 +104,7 @@ def main():
 
     print(f"\n[+] Received {rx_frames} telemetry packets in ~3 seconds!")
     if samples_received:
-        print("[+] Decoded live telemetry values:")
+        print("\n[+] Decoded live telemetry values:")
         for sid, raw_val in sorted(samples_received.items()):
             meta = id_map.get(sid, {})
             name = meta.get("name", f"ID_{sid}")
@@ -105,6 +112,17 @@ def main():
             unit = meta.get("unit", "")
             phys_val = raw_val / scale if scale != 0 else raw_val
             print(f"    - {name:<20}: {phys_val:10.2f} {unit}")
+
+        if 21 in samples_received:
+            err = samples_received[21]
+            if err == 0:
+                print("\n[+] Gate Driver (DRV8353) Check: OK (All SPI registers verified, nFAULT PB12 is HIGH, errorState = 0)")
+            elif err == 1:
+                print(f"\n[-] Gate Driver (DRV8353) Check: ERROR (SPI readback mismatch, errorState = {err})")
+            elif err == 2:
+                print(f"\n[-] Gate Driver (DRV8353) Check: HARDWARE FAULT (DRV_Fault PB12 pin is LOW, errorState = {err})")
+            else:
+                print(f"\n[-] Gate Driver (DRV8353) Check: UNKNOWN ERROR (errorState = {err})")
 
         print("\n[SUCCESS] Bi-directional USB communication is fully operational!")
     else:

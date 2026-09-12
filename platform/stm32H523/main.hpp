@@ -20,6 +20,7 @@ extern "C"
 {
 #include "gpio.h"
 #include "main.h"
+#include "spi.h"
 #include "usb.h"
 void SystemClock_Config(void);
 }
@@ -46,8 +47,16 @@ struct MainApp
         HAL_Init();
         SystemClock_Config();
         MX_GPIO_Init();
+        MX_SPI3_Init();
 
         hal::DwtCycleCounter::enable();
+
+        // Initialize DRV8353 gate driver via SPI3
+        bool drv_ok = platform::init_gate_driver();
+        if (!drv_ok)
+        {
+            platform::ui.errorState = 1.0f; // Indicate SPI init error in telemetry
+        }
 
         // Initialize heartbeat first so status LED blinks immediately
         hb.start(tick);
@@ -102,7 +111,15 @@ struct MainApp
                     platform::ui.observerSpeed_rpm = 0.0f;
                     platform::ui.Iq_A = 0.0f;
                 }
-                platform::ui.temp_C = 36.5f;
+                // Monitor DRV8353 Hardware Fault Pin (PB12 active LOW)
+                if (platform::gate_driver.is_fault_pin_active())
+                {
+                    platform::ui.errorState = 2.0f; // DRV8353 hardware fault asserted
+                }
+                else if (platform::ui.errorState == 2.0f)
+                {
+                    platform::ui.errorState = 0.0f; // Fault cleared
+                }
 
                 // Push samples to telemetry buffer and send batch to host
                 comm::g_telemetry_manager.capture_telemetry_isr();
