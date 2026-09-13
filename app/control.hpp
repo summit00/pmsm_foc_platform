@@ -560,11 +560,12 @@ class Control
         mUi.driveState = static_cast<float>(mDsm.getState());
 
         mUi.Rs_ohm = mMotorParams.Rs_ohm;
-        mUi.RTotal_ohm = mMotorParams.RTotal_ohm;
         mUi.Ld_uH = mMotorParams.Ld_H * 1000000.0f;
         mUi.Lq_uH = mMotorParams.Lq_H * 1000000.0f;
         mUi.flux_pm_mWb = mMotorParams.flux_pm_Wb * 1000.0f;
         mUi.encoderOffset_ticks = static_cast<float>(mMotorParams.encoderOffset_ticks);
+        mUi.encoderIndexFound = mEncoderSensor.getEncoder().has_index() ? 1.0f : 0.0f;
+        mUi.encoderRawTicks = static_cast<float>(mEncoderSensor.getEncoder().read_raw());
     }
 
     /**

@@ -152,6 +152,10 @@ struct MainApp
             ui.targetSpeed_rpm = c.targetSpeed_rpm;
             ui.mAcceleration_rpm_s = c.accel_rpm_s;
             ui.mIsAbs_mA = c.isAbs_mA;
+            if (c.encoderOffset_ticks > 0.0f)
+            {
+                platform::motor_params.encoderOffset_ticks = static_cast<uint16_t>(c.encoderOffset_ticks);
+            }
             ui.rxPackets += 1.0f;
         }, &platform::ui);
 #endif

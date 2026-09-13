@@ -52,6 +52,11 @@ class EncoderSensor : public ISensor
         mPllKi = ki;
     }
 
+    const IEncoder& getEncoder() const
+    {
+        return mEncoder;
+    }
+
   private:
     void readAndProcessAngle()
     {

@@ -1,7 +1,6 @@
 #pragma once
 #include "math.hpp"
 #include "motor_params.hpp"
-#include "powerstage_config.hpp"
 #include "ramp_generator.hpp"
 #include <algorithm>
 #include <array>
@@ -35,10 +34,9 @@ class AutoSetup
         LS_MEASURE,
         LS_RAMP_DOWN,
         PI_TUNE,
+        PSI_MEASUREMENT,
         ALIGN_FWD,
         ALIGN_BWD,
-        SPEED_RAMP_DOWN,
-        PSI_MEASUREMENT,
         SPEED_RAMP_STOP,
         FINISHED
     };
@@ -53,12 +51,12 @@ class AutoSetup
 
         static constexpr float RS_RAMP_RATE_A_S = 2.0f;
         static constexpr float RS_DISCHARGE_RATE_A_S = 5.0f;
-        static constexpr float ALIGN_ACCEL_RAD_S2 = 500.0f;
         static constexpr float STOP_ACCEL_RAD_S2 = 1000.0f;
 
         static constexpr float LS_INJECTION_FREQ_HZ = 1000.0f;
-        static constexpr float ALIGN_SPEED_RAD_S = 800.0f;
-        static constexpr float SETTLE_THRESHOLD_RAD_S = 0.1f;
+        static constexpr float ALIGN_SPEED_RAD_S = 420.0f;
+        static constexpr float ALIGN_ACCEL_RAD_S2 = 400.0f;
+        static constexpr float SETTLE_THRESHOLD_RAD_S = 1.0f;
     };
 
     explicit AutoSetup(MotorParams& params, float pwmPeriod_s)
@@ -111,20 +109,31 @@ class AutoSetup
             case State::PI_TUNE:
                 ref.TriggerTuning = true;
                 resetPhase();
-                mState = State::ALIGN_FWD;
+                mState = State::PSI_MEASUREMENT;
                 break;
 
-            case State::ALIGN_FWD:
+            case State::PSI_MEASUREMENT:
                 ref.IdRef_A = mTargetCurrent_A;
                 ref.sensorMode = 0;
                 if (rampSpeed(
                         Config::ALIGN_SPEED_RAD_S, Config::ALIGN_ACCEL_RAD_S2, ref.OmegaRef_rad_Hz))
                 {
-                    if (averageOffset(thetaOpenLoop_rad, thetaEncoder_rad, mOffsetFwd_rad))
+                    if (measurePsi(Id_A, Iq_A, UqApplied_V, ref.OmegaRef_rad_Hz))
                     {
                         resetPhase();
-                        mState = State::ALIGN_BWD;
+                        mState = State::ALIGN_FWD;
                     }
+                }
+                break;
+
+            case State::ALIGN_FWD:
+                ref.IdRef_A = mTargetCurrent_A;
+                ref.sensorMode = 0;
+                ref.OmegaRef_rad_Hz = Config::ALIGN_SPEED_RAD_S;
+                if (averageOffset(thetaOpenLoop_rad, thetaEncoder_rad, mOffsetFwd_rad))
+                {
+                    resetPhase();
+                    mState = State::ALIGN_BWD;
                 }
                 break;
 
@@ -140,31 +149,6 @@ class AutoSetup
                     {
                         calculateFinalOffset();
                         resetPhase();
-                        mState = State::SPEED_RAMP_DOWN;
-                    }
-                }
-                break;
-
-            case State::SPEED_RAMP_DOWN:
-                ref.IdRef_A = mTargetCurrent_A;
-
-                if (rampSpeed(0.0f, Config::STOP_ACCEL_RAD_S2, ref.OmegaRef_rad_Hz))
-                {
-                    resetPhase();
-                    mState = State::PSI_MEASUREMENT;
-                }
-                break;
-
-            case State::PSI_MEASUREMENT:
-                ref.IdRef_A = mTargetCurrent_A;
-                ref.OmegaRef_rad_Hz =
-                    mRampSpeed.update(-Config::ALIGN_SPEED_RAD_S, Config::ALIGN_ACCEL_RAD_S2);
-                if (std::abs(ref.OmegaRef_rad_Hz + Config::ALIGN_SPEED_RAD_S) <
-                    Config::SETTLE_THRESHOLD_RAD_S)
-                {
-                    if (measurePsi(Id_A, Iq_A, UqApplied_V, ref.OmegaRef_rad_Hz))
-                    {
-                        resetPhase();
                         mState = State::SPEED_RAMP_STOP;
                     }
                 }
@@ -172,7 +156,7 @@ class AutoSetup
 
             case State::SPEED_RAMP_STOP:
                 ref.IdRef_A = mTargetCurrent_A;
-
+                ref.sensorMode = 0;
                 if (rampSpeed(0.0f, Config::STOP_ACCEL_RAD_S2, ref.OmegaRef_rad_Hz))
                 {
                     resetPhase();
@@ -196,6 +180,7 @@ class AutoSetup
         mTargetCurrent_A = IsAbs_A;
         mInjectionVoltage_V = 0.0f;
         mTime_s = 0.0f;
+        mParams.encoderOffset_ticks = 0;
         mState = State::RS_RAMP_UP;
         resetPhase();
     }
@@ -251,9 +236,7 @@ class AutoSetup
                 return false;
             }
 
-            mParams.RTotal_ohm = meanU / meanI;
-            auto config = getPowerStageConfig();
-            mParams.Rs_ohm = std::max(0.001f, mParams.RTotal_ohm - config.RtotalOffset_ohm);
+            mParams.Rs_ohm = meanU / meanI;
             resetPhase();
             return true;
         }
@@ -266,7 +249,7 @@ class AutoSetup
 
         if (mInjectionVoltage_V == 0.0f)
         {
-            mInjectionVoltage_V = mParams.RTotal_ohm * mTargetCurrent_A;
+            mInjectionVoltage_V = mParams.Rs_ohm * mTargetCurrent_A;
         }
 
         mTime_s += mPwmPeriod_s;
@@ -284,7 +267,7 @@ class AutoSetup
             const float reactance_ohm =
                 std::sqrt(std::max(0.0f,
                                    math::square(mInjectionVoltage_V / mMeasuredCurrentPeak_A) -
-                                       math::square(mParams.RTotal_ohm)));
+                                       math::square(mParams.Rs_ohm)));
             const float inductance_H = reactance_ohm / omega_rad_Hz;
 
             mParams.Ld_H = inductance_H;
@@ -318,7 +301,7 @@ class AutoSetup
             // Uq = Rs * Iq + omega * (Ld * Id + Psi_pm)
             // Psi_pm = (Uq - Rs * Iq) / omega - Ld * Id
             mParams.flux_pm_Wb =
-                (avgUq - (mParams.RTotal_ohm * avgIq)) / avgOmega - (mParams.Ld_H * avgId);
+                (avgUq - (mParams.Rs_ohm * avgIq)) / avgOmega - (mParams.Ld_H * avgId);
 
             // Safety: Ensure flux is positive.
             mParams.flux_pm_Wb = std::abs(mParams.flux_pm_Wb);
@@ -362,17 +345,16 @@ class AutoSetup
     {
         if (++mTimer < Config::ALIGN_SETTLE_SAMPLES)
             return false;
-        float diff = ref - fb;
-        // Wrap difference to [-PI, PI]
-        while (diff > math::PI)
-            diff -= 2.0f * math::PI;
-        while (diff < -math::PI)
-            diff += 2.0f * math::PI;
 
-        mOffsetSum_rad += diff;
+        float diff = ref - fb;
+        float s, c;
+        std::tie(s, c) = math::sin_cos(diff);
+        mSinSum += s;
+        mCosSum += c;
+
         if (++mSamples >= Config::ALIGN_SETTLE_SAMPLES)
         {
-            result = mOffsetSum_rad / mSamples;
+            result = std::atan2(mSinSum, mCosSum);
             return true;
         }
         return false;
@@ -380,22 +362,27 @@ class AutoSetup
 
     void calculateFinalOffset()
     {
-        float finalRad = (mOffsetFwd_rad + mOffsetBwd_rad) * 0.5f;
-        float ticksPerRev = static_cast<float>(mParams.encoderTicks);
-        float polePairs = static_cast<float>(mParams.polePairs);
+        float s_fwd, c_fwd, s_bwd, c_bwd;
+        std::tie(s_fwd, c_fwd) = math::sin_cos(mOffsetFwd_rad);
+        std::tie(s_bwd, c_bwd) = math::sin_cos(mOffsetBwd_rad);
 
-        int32_t ticksPerElecRev = static_cast<int32_t>(ticksPerRev / polePairs);
+        float avg_s = s_fwd + s_bwd;
+        float avg_c = c_fwd + c_bwd;
+        float finalRad = std::atan2(avg_s, avg_c);
 
-        int32_t offset =
-            static_cast<int32_t>((finalRad * ticksPerRev) / (math::TWO_PI * polePairs));
-
-        offset %= ticksPerElecRev;
-        if (offset < 0)
+        if (finalRad < 0.0f)
         {
-            offset += ticksPerElecRev;
+            finalRad += math::TWO_PI;
         }
 
-        mParams.encoderOffset_ticks = offset;
+        float ticksPerRev = static_cast<float>(mParams.encoderTicks);
+        float polePairs = static_cast<float>(mParams.polePairs);
+        int32_t ticksPerElecRev = static_cast<int32_t>(ticksPerRev / polePairs);
+
+        int32_t offset = static_cast<int32_t>((finalRad / math::TWO_PI) * static_cast<float>(ticksPerElecRev) + 0.5f);
+        offset = ((offset % ticksPerElecRev) + ticksPerElecRev) % ticksPerElecRev;
+
+        mParams.encoderOffset_ticks = static_cast<uint16_t>(offset);
     }
 
     void resetPhase()
@@ -408,7 +395,8 @@ class AutoSetup
         mIqSum = 0;
         mOmegaSum = 0;
         mMeasuredCurrentPeak_A = 0;
-        mOffsetSum_rad = 0;
+        mSinSum = 0.0f;
+        mCosSum = 0.0f;
     }
 
     MotorParams& mParams;
@@ -428,7 +416,8 @@ class AutoSetup
     float mOmegaSum{0};
     float mOffsetFwd_rad{0.0f};
     float mOffsetBwd_rad{0.0f};
-    float mOffsetSum_rad{0.0f};
+    float mSinSum{0.0f};
+    float mCosSum{0.0f};
     uint32_t mTimer{0};
     uint32_t mSamples{0};
 };

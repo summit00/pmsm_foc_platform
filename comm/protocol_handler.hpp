@@ -21,6 +21,7 @@ class ProtocolHandler
         float targetSpeed_rpm;
         float accel_rpm_s;
         float isAbs_mA;
+        float encoderOffset_ticks;
     };
 
     using RxCallback = void(*)(const RxCommand&, void* ctx);
@@ -157,7 +158,8 @@ class ProtocolHandler
                           p[1],
                           static_cast<float>(p[2]) * 0.01f,
                           static_cast<float>(p[3]) * 0.01f,
-                          static_cast<float>(p[4]) * 0.1f};
+                          static_cast<float>(p[4]) * 0.1f,
+                          static_cast<float>(p[5]) * 1.0f};
             if (rxCb_)
             {
                 rxCb_(cmd, rxCtx_);

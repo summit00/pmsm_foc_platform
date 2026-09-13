@@ -56,6 +56,7 @@ CMD_MAP = {
     "targetSpeed_rpm": ("Target Speed", 100.0, "rpm"),
     "mAcceleration_rpm_s": ("Accel", 100.0, "rpm/s"),
     "mIsAbs_mA": ("Current Limit", 10.0, "mA"),
+    "encoderOffset": ("Encoder Offset", 1.0, "ticks"),
 }
 
 TX_SLOTS = []

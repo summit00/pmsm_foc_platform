@@ -24,6 +24,11 @@
       "name": "mIsAbs_mA",
       "type": "float",
       "default": 0.0
+    },
+    {
+      "name": "encoderOffset",
+      "type": "float",
+      "default": 0.0
     }
   ],
   "telemetry": [
@@ -239,38 +244,45 @@
     },
     {
       "id": 31,
-      "name": "RTotal_ohm",
-      "scale": 1000.0,
-      "unit": "Ohm",
-      "description": "Total measured circuit resistance"
-    },
-    {
-      "id": 32,
       "name": "Ld_uH",
       "scale": 1.0,
       "unit": "uH",
       "description": "Direct-axis inductance"
     },
     {
-      "id": 33,
+      "id": 32,
       "name": "Lq_uH",
       "scale": 1.0,
       "unit": "uH",
       "description": "Quadrature-axis inductance"
     },
     {
-      "id": 34,
+      "id": 33,
       "name": "flux_pm_mWb",
       "scale": 100.0,
       "unit": "mWb",
       "description": "PM Flux Linkage"
     },
     {
-      "id": 35,
+      "id": 34,
       "name": "encoderOffset",
       "scale": 1.0,
       "unit": "ticks",
       "description": "Calibrated encoder electrical offset"
+    },
+    {
+      "id": 35,
+      "name": "encoderIndex",
+      "scale": 1.0,
+      "unit": "",
+      "description": "Encoder Index Z-pulse captured (1=Yes, 0=No)"
+    },
+    {
+      "id": 36,
+      "name": "encoderTicks",
+      "scale": 1.0,
+      "unit": "ticks",
+      "description": "Encoder raw timer ticks"
     }
   ]
 }

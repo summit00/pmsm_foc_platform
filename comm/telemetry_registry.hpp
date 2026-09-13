@@ -46,11 +46,12 @@ static constexpr TelemetryRegistryEntry telemetry_registry[] = {
     {"rxPackets",         28, &::platform::ui.rxPackets,         1.0f,    "",    "USB Command Packets Received"},
     {"driveState",        29, &::platform::ui.driveState,        1.0f,    "",    "Drive State (0=PwrOff,1=Init,2=Ready,3=Enabling,4=Enabled,5=Fault)"},
     {"Rs_ohm",            30, &::platform::ui.Rs_ohm,            1000.0f, "Ohm", "Identified stator phase resistance"},
-    {"RTotal_ohm",        31, &::platform::ui.RTotal_ohm,        1000.0f, "Ohm", "Total measured circuit resistance"},
-    {"Ld_uH",             32, &::platform::ui.Ld_uH,             1.0f,    "uH",  "Direct-axis inductance"},
-    {"Lq_uH",             33, &::platform::ui.Lq_uH,             1.0f,    "uH",  "Quadrature-axis inductance"},
-    {"flux_pm_mWb",       34, &::platform::ui.flux_pm_mWb,       100.0f,  "mWb", "PM Flux Linkage"},
-    {"encoderOffset",     35, &::platform::ui.encoderOffset_ticks, 1.0f,  "ticks", "Calibrated encoder electrical offset"}
+    {"Ld_uH",             31, &::platform::ui.Ld_uH,             1.0f,    "uH",  "Direct-axis inductance"},
+    {"Lq_uH",             32, &::platform::ui.Lq_uH,             1.0f,    "uH",  "Quadrature-axis inductance"},
+    {"flux_pm_mWb",       33, &::platform::ui.flux_pm_mWb,       100.0f,  "mWb", "PM Flux Linkage"},
+    {"encoderOffset",     34, &::platform::ui.encoderOffset_ticks, 1.0f,  "ticks", "Calibrated encoder electrical offset"},
+    {"encoderIndex",      35, &::platform::ui.encoderIndexFound,  1.0f,    "",    "Encoder Index Z-pulse captured (1=Yes, 0=No)"},
+    {"encoderTicks",      36, &::platform::ui.encoderRawTicks,    1.0f,    "ticks", "Encoder raw timer ticks"}
 };
 
 static constexpr size_t TELEMETRY_REGISTRY_SIZE = sizeof(telemetry_registry) / sizeof(telemetry_registry[0]);

@@ -48,11 +48,14 @@ struct UserInterface
 
     // Motor Parameters (Identified / Configured)
     float Rs_ohm = 0.0f;
-    float RTotal_ohm = 0.0f;
     float Ld_uH = 0.0f;
     float Lq_uH = 0.0f;
     float flux_pm_mWb = 0.0f;
     float encoderOffset_ticks = 0.0f;
+
+    // Encoder Diagnostics
+    float encoderIndexFound = 0.0f;
+    float encoderRawTicks = 0.0f;
 };
 
 } // namespace app
