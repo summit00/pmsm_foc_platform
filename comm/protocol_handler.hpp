@@ -50,7 +50,7 @@ class ProtocolHandler
     static constexpr uint16_t PAYLOAD_N = 10u;
     static constexpr uint16_t FRAME_BYTES = 4u + PAYLOAD_N * 4u; // 44 bytes
 
-    static constexpr size_t MAX_BATCH_SAMPLES = 240;
+    static constexpr size_t MAX_BATCH_SAMPLES = 120;
     static constexpr size_t TX_BATCH_HEADER_BYTES = 6;
     static constexpr size_t TX_BUFFER_BYTES =
         TX_BATCH_HEADER_BYTES + MAX_BATCH_SAMPLES * sizeof(platform::Sample);

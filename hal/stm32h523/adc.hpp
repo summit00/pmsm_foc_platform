@@ -29,8 +29,8 @@ class ADCSense : public app::IADC
     app::PhaseCurrents read_amps() const override
     {
         const float scale = cfg.counts_to_amps();
-        return {-static_cast<float>(static_cast<int32_t>(ia_counts) - cfg.adc_ia_offset) * scale,
-                -static_cast<float>(static_cast<int32_t>(ic_counts) - cfg.adc_ic_offset) * scale};
+        return {static_cast<float>(static_cast<int32_t>(ia_counts) - cfg.adc_ia_offset) * scale,
+                static_cast<float>(static_cast<int32_t>(ic_counts) - cfg.adc_ic_offset) * scale};
     }
 
     float read_bus_voltage() const override
@@ -41,9 +41,14 @@ class ADCSense : public app::IADC
 
     float read_temperature_celsius() const override
     {
+        if (temp_counts == 0)
+        {
+            return 25.0f; // Default room temperature when no sensor is mapped
+        }
+
         float v_out = (static_cast<float>(temp_counts) / 4095.0f) * cfg.adc_vref_V;
         if (v_out < 0.1f)
-            return -273.15f;
+            return 25.0f;
 
         float r_ntc = cfg.ntc_pull_down_r * (cfg.adc_vref_V / v_out - 1.0f);
         float steinhart = std::log(r_ntc / cfg.ntc_r25) / cfg.ntc_beta;
@@ -53,19 +58,19 @@ class ADCSense : public app::IADC
 
     void calibrate_offset() override
     {
-        constexpr uint16_t N = 1000;
+        constexpr uint32_t N = 4000;
         uint32_t sum_a = 0;
-        uint32_t sum_b = 0;
+        uint32_t sum_c = 0;
 
-        for (uint16_t i = 0; i < N; ++i)
+        for (uint32_t i = 0; i < N; ++i)
         {
             sum_a += ia_counts;
-            sum_b += ic_counts;
-            hal::DwtCycleCounter::delay_us(200);
+            sum_c += ic_counts;
+            hal::DwtCycleCounter::delay_us(50);
         }
 
         cfg.adc_ia_offset = static_cast<uint16_t>(sum_a / N);
-        cfg.adc_ic_offset = static_cast<uint16_t>(sum_b / N);
+        cfg.adc_ic_offset = static_cast<uint16_t>(sum_c / N);
     }
 
   private:

@@ -231,7 +231,7 @@ class AutoSetup
         if (++mTimer < Config::RS_SETTLE_TICKS)
             return false;
 
-        if (std::abs(Iq_A) > (mTargetCurrent_A * 0.1f))
+        if (std::abs(Iq_A) > std::max(0.15f, mTargetCurrent_A * 0.35f))
         {
             resetPhase();
             return false;
@@ -253,7 +253,7 @@ class AutoSetup
 
             mParams.RTotal_ohm = meanU / meanI;
             auto config = getPowerStageConfig();
-            mParams.Rs_ohm = mParams.RTotal_ohm - config.RtotalOffset_ohm;
+            mParams.Rs_ohm = std::max(0.001f, mParams.RTotal_ohm - config.RtotalOffset_ohm);
             resetPhase();
             return true;
         }

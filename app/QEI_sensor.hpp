@@ -16,7 +16,7 @@ class EncoderSensor : public ISensor
                   float pwmPeriod_s,
                   float polePairs,
                   float maxEncoderTicks,
-                  uint16_t offsetTicks)
+                  const uint16_t& offsetTicks)
         : mEncoder(encoder), mPwmPeriod_s(pwmPeriod_s), mPolePairs_count(polePairs),
           mMaxTicks_count(maxEncoderTicks), mOffset_ticks(offsetTicks)
     {
@@ -103,7 +103,7 @@ class EncoderSensor : public ISensor
     const float mPwmPeriod_s;
     const float mPolePairs_count;
     const float mMaxTicks_count;
-    const uint16_t mOffset_ticks;
+    const uint16_t& mOffset_ticks;
 
     float mTheta_rad{0.0f};
 

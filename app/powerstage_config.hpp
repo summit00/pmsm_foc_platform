@@ -19,10 +19,10 @@ struct PowerStageConfig
 inline PowerStageConfig getPowerStageConfig()
 {
 #if defined(TARGET_STM32)
-    // Hardware values for typical 3-phase inverter:
-    // - 0.33 ohm shunt per phase (3x = 1.0 ohm total)
-    // - 0.73 ohm Rds_on for low-side MOSFETs
-    return {0.33f, 0.73f, 1.03f};
+    // Hardware values for 3-phase inverter:
+    // - 0.01 ohm (10 mOhm) shunt per phase
+    // - ~5 mOhm MOSFET Rds_on + trace resistance
+    return {0.01f, 0.005f, 0.015f};
 #else
     // Simulation/host: no hardware resistance
     return {0.0f, 0.0f, 0.0f};

@@ -17,9 +17,31 @@ class Inverter : public app::IInverter
     void
     set_phase_voltages(float va_V, float vb_V, float vc_V, float v_bus_V, bool isEnabled) override
     {
-        float duty_a = isEnabled ? std::clamp(0.5f + va_V / v_bus_V, minDuty, maxDuty) : 0.0f;
-        float duty_b = isEnabled ? std::clamp(0.5f + vb_V / v_bus_V, minDuty, maxDuty) : 0.0f;
-        float duty_c = isEnabled ? std::clamp(0.5f + vc_V / v_bus_V, minDuty, maxDuty) : 0.0f;
+        if (!isEnabled)
+        {
+            if (is_moe_enabled_)
+            {
+                __HAL_TIM_MOE_DISABLE(htim_);
+                is_moe_enabled_ = false;
+            }
+            __HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_1, 0);
+            __HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_2, 0);
+            __HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_3, 0);
+            return;
+        }
+
+        if (!is_moe_enabled_)
+        {
+            __HAL_TIM_MOE_ENABLE(htim_);
+            is_moe_enabled_ = true;
+        }
+
+        // Safe bus voltage to prevent NaN/Infinity division
+        float safe_vbus = (v_bus_V > 1.0f) ? v_bus_V : 12.0f;
+
+        float duty_a = std::clamp(0.5f + va_V / safe_vbus, minDuty, maxDuty);
+        float duty_b = std::clamp(0.5f + vb_V / safe_vbus, minDuty, maxDuty);
+        float duty_c = std::clamp(0.5f + vc_V / safe_vbus, minDuty, maxDuty);
 
         const uint32_t arr = htim_->Instance->ARR;
 
@@ -30,7 +52,8 @@ class Inverter : public app::IInverter
 
   private:
     TIM_HandleTypeDef* htim_;
-    float minDuty = 0.0f;
+    bool is_moe_enabled_ = false;
+    float minDuty = 0.05f;
     float maxDuty = 0.95f;
 };
 

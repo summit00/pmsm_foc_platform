@@ -37,7 +37,20 @@ static constexpr TelemetryRegistryEntry telemetry_registry[] = {
     {"Ubeta_V",           19, &::platform::ui.Ubeta_V,           1000.0f, "V",   "Beta voltage component"},
     {"temp_C",            20, &::platform::ui.temp_C,            10.0f,   "C",   "Inverter temperature"},
     {"errorState",        21, &::platform::ui.errorState,        1.0f,    "",    "Motor error/fault state code"},
-    {"autoSetupState",    22, &::platform::ui.autoSetupState,    1.0f,    "",    "Autosetup sequence state code"}
+    {"autoSetupState",    22, &::platform::ui.autoSetupState,    1.0f,    "",    "Autosetup sequence state code"},
+    {"drvFault1",         23, &::platform::ui.drvFault1,         1.0f,    "",    "DRV8353 Fault Status 1 Register"},
+    {"drvFault2",         24, &::platform::ui.drvFault2,         1.0f,    "",    "DRV8353 Fault Status 2 Register"},
+    {"drvInitOk",         25, &::platform::ui.drvInitOk,         1.0f,    "",    "DRV8353 SPI Init OK (1=Yes, 0=No)"},
+    {"cmdEnable",         26, &::platform::ui.cmdEnable,         1.0f,    "",    "Commanded Motor Enable state"},
+    {"cmdMode",           27, &::platform::ui.cmdMode,           1.0f,    "",    "Commanded Mode state"},
+    {"rxPackets",         28, &::platform::ui.rxPackets,         1.0f,    "",    "USB Command Packets Received"},
+    {"driveState",        29, &::platform::ui.driveState,        1.0f,    "",    "Drive State (0=PwrOff,1=Init,2=Ready,3=Enabling,4=Enabled,5=Fault)"},
+    {"Rs_ohm",            30, &::platform::ui.Rs_ohm,            1000.0f, "Ohm", "Identified stator phase resistance"},
+    {"RTotal_ohm",        31, &::platform::ui.RTotal_ohm,        1000.0f, "Ohm", "Total measured circuit resistance"},
+    {"Ld_uH",             32, &::platform::ui.Ld_uH,             1.0f,    "uH",  "Direct-axis inductance"},
+    {"Lq_uH",             33, &::platform::ui.Lq_uH,             1.0f,    "uH",  "Quadrature-axis inductance"},
+    {"flux_pm_mWb",       34, &::platform::ui.flux_pm_mWb,       100.0f,  "mWb", "PM Flux Linkage"},
+    {"encoderOffset",     35, &::platform::ui.encoderOffset_ticks, 1.0f,  "ticks", "Calibrated encoder electrical offset"}
 };
 
 static constexpr size_t TELEMETRY_REGISTRY_SIZE = sizeof(telemetry_registry) / sizeof(telemetry_registry[0]);

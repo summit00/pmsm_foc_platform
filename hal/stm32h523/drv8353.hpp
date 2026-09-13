@@ -518,7 +518,7 @@ private:
                                 reinterpret_cast<const uint8_t*>(&tx_word),
                                 reinterpret_cast<uint8_t*>(&rx_word),
                                 1,
-                                50);
+                                2);
 
         for (int i = 0; i < 20; ++i) { __NOP(); }
         cs_high();

@@ -70,10 +70,9 @@ class Control
                          motor_params.polePairs,
                          static_cast<float>(motor_params.encoderTicks),
                          motor_params.encoderOffset_ticks),
-          mSensorSelector(mOpenLoopSensor, mEncoderSensor),
-          mFoc(motor_params, pwmPeriod_s), mFaultManager(), mSpeedRamp(pwmPeriod_s),
-          mAutoSetup(mMotorParams, pwmPeriod_s), mDsmHardware(*this), mDsm(mDsmHardware),
-          mModeManager(mFoc, mAutoSetup)
+          mSensorSelector(mOpenLoopSensor, mEncoderSensor), mFoc(motor_params, pwmPeriod_s),
+          mFaultManager(), mSpeedRamp(pwmPeriod_s), mAutoSetup(mMotorParams, pwmPeriod_s),
+          mDsmHardware(*this), mDsm(mDsmHardware), mModeManager(mFoc, mAutoSetup)
     {
         mUdcBus_V = mAdcSense.read_bus_voltage();
         mTemp_C = mAdcSense.read_temperature_celsius();
@@ -245,7 +244,6 @@ class Control
         return mEncoderSensor.getOmega_rad_Hz();
     }
 
-
     /**
      * @brief Get the motor stator winding resistance.
      * @return Stator resistance in Ohms.
@@ -351,7 +349,13 @@ class Control
             mSensorSelector.selectSensor(modeRefs.requestedSensor);
         }
 
-        if (!bypassCurrentControl)
+        if (mIsAbs_A <= 0.001f && mIdRef_A == 0.0f && mIqRef_A == 0.0f && !bypassCurrentControl)
+        {
+            mUd_V = 0.1f;
+            mUq_V = 0.0f;
+            mFoc.resetFoc();
+        }
+        else if (!bypassCurrentControl)
         {
             std::tie(mUd_V, mUq_V) = mFoc.runCurrentControl(mIdRef_A,
                                                             mIqRef_A,
@@ -372,7 +376,7 @@ class Control
 
         auto [Va_svm_V, Vb_svm_V, Vc_svm_V] = spaceVectorModulation(Va_V, Vb_V, Vc_V);
 
-        mInverter.set_phase_voltages(Va_V, Vb_V, Vc_V, mUdcBus_V, mMotorEnabled_bool);
+        mInverter.set_phase_voltages(Va_svm_V, Vb_svm_V, Vc_svm_V, mUdcBus_V, mMotorEnabled_bool);
 
         updateTelemetry();
     }
@@ -415,11 +419,11 @@ class Control
             mCmdMotorEnabled_bool = false;
             mUi.mEnable = 0;
         }
-
-        if (mDsm.getState() == DriveState::Fault)
+        else if (mDsm.getState() == DriveState::Fault)
         {
-            mCmdMotorEnabled_bool = false;
-            mUi.mEnable = 0;
+            // Auto-recover from transient startup fault once ADC measures valid bus voltage
+            mDsm.resetFault();
+            mDsm.update();
         }
 
         return currents;
@@ -450,20 +454,23 @@ class Control
     void readUserCommands()
     {
         bool cmdEnable = static_cast<bool>(mUi.mEnable);
-        if (cmdEnable && !mCmdMotorEnabled_bool)
+        if (cmdEnable)
         {
             if (mDsm.getState() == DriveState::Fault)
             {
                 mDsm.resetFault();
             }
-            else
+            else if (mDsm.getState() == DriveState::Ready)
             {
                 mDsm.startDrive();
             }
         }
-        else if (!cmdEnable && mCmdMotorEnabled_bool)
+        else
         {
-            mDsm.stopDrive();
+            if (mDsm.getState() == DriveState::Enabling || mDsm.getState() == DriveState::Enabled)
+            {
+                mDsm.stopDrive();
+            }
         }
         mCmdMotorEnabled_bool = cmdEnable;
 
@@ -550,6 +557,14 @@ class Control
         mUi.temp_C = mTemp_C;
         mUi.errorState = static_cast<float>(mIsErrorrState);
         mUi.autoSetupState = static_cast<float>(mAutoSetup.getState());
+        mUi.driveState = static_cast<float>(mDsm.getState());
+
+        mUi.Rs_ohm = mMotorParams.Rs_ohm;
+        mUi.RTotal_ohm = mMotorParams.RTotal_ohm;
+        mUi.Ld_uH = mMotorParams.Ld_H * 1000000.0f;
+        mUi.Lq_uH = mMotorParams.Lq_H * 1000000.0f;
+        mUi.flux_pm_mWb = mMotorParams.flux_pm_Wb * 1000.0f;
+        mUi.encoderOffset_ticks = static_cast<float>(mMotorParams.encoderOffset_ticks);
     }
 
     /**

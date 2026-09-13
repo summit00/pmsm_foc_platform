@@ -167,7 +167,7 @@ class TelemetryManager
   private:
     uint16_t selected_ids_[MAX_SELECTED_IDS] = {};
     ActiveTelemetry active_entries_[MAX_SELECTED_IDS] = {};
-    platform::RingBuffer<platform::Sample, 2048> tx_queue_;
+    platform::RingBuffer<platform::Sample, 4096> tx_queue_;
 };
 
 inline TelemetryManager g_telemetry_manager;

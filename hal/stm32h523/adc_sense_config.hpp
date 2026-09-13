@@ -8,9 +8,9 @@ struct BoardSensorsConfig
 {
     float adc_vref_V = 3.3f;
     float shunt_resistor_ohm = 0.01f;
-    float current_amp_gain = 50.0f;
-    float vbus_r_top_ohm = 169000.0f;
-    float vbus_r_bottom_ohm = 18000.0f;
+    float current_amp_gain = 20.0f;
+    float vbus_r_top_ohm = 100000.0f;
+    float vbus_r_bottom_ohm = 3300.0f;
     float ntc_pull_down_r = 4700.0f;
     float ntc_r25 = 10000.0f;
     float ntc_beta = 3455.0f;

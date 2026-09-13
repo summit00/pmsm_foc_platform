@@ -26,14 +26,10 @@ class GateDriverEnable final : public app::IEnableOutput
 
     void set_enable(bool enabled) override
     {
-        GPIO_PinState state = enabled ? GPIO_PIN_SET : GPIO_PIN_RESET;
-        HAL_GPIO_WritePin(pin_a_.port, pin_a_.pin, state);
-        if (!single_pin_)
-        {
-            HAL_GPIO_WritePin(pin_b_.port, pin_b_.pin, state);
-            HAL_GPIO_WritePin(pin_c_.port, pin_c_.pin, state);
-            HAL_GPIO_WritePin(pin_d_.port, pin_d_.pin, state);
-        }
+        (void)enabled;
+        // The DRV8353 Smart Gate Driver ENABLE pin (PB10) must remain HIGH continuously
+        // to prevent resetting SPI registers (3-PWM mode, CSA gain) and dropping CSAs into sleep mode.
+        // Inverter stage enabling/disabling is handled by PWM duty modulation in Inverter.
     }
 
   private:

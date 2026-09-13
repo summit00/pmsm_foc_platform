@@ -156,8 +156,8 @@ public:
         HAL_Delay(10);
         HAL_PCD_Start(&hpcd);
 
-        // 12. Enable USB Interrupt
-        HAL_NVIC_SetPriority(USB_DRD_FS_IRQn, 6, 0);
+        // 12. Enable USB Interrupt (Priority 1: just below 20 kHz ADC IRQ at priority 0)
+        HAL_NVIC_SetPriority(USB_DRD_FS_IRQn, 1, 0);
         HAL_NVIC_EnableIRQ(USB_DRD_FS_IRQn);
 
         return true;
