@@ -36,6 +36,26 @@ struct UserInterface
     float temp_C = 0.0f;
     float errorState = 0.0f;
     float autoSetupState = 0.0f;
+
+    // DRV8353 & Diagnostics
+    float drvFault1 = 0.0f;
+    float drvFault2 = 0.0f;
+    float drvInitOk = 0.0f;
+    float cmdEnable = 0.0f;
+    float cmdMode = 0.0f;
+    float rxPackets = 0.0f;
+    float driveState = 0.0f;
+
+    // Motor Parameters (Identified / Configured)
+    float Rs_ohm = 0.0f;
+    float Ld_uH = 0.0f;
+    float Lq_uH = 0.0f;
+    float flux_pm_mWb = 0.0f;
+    float encoderOffset_ticks = 0.0f;
+
+    // Encoder Diagnostics
+    float encoderIndexFound = 0.0f;
+    float encoderRawTicks = 0.0f;
 };
 
 } // namespace app

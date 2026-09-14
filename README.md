@@ -78,8 +78,11 @@ This project implements a Field-Oriented Control (FOC) platform for Permanent Ma
 - Red --> Vcc
 - Black --> GND
 - Green --> A
+- Brown --> inv A
 - White --> B
+- Grey --> inv B
 - Orange --> Index
+- Yellow --> inv Index
 
 ## License
 

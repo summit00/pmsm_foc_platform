@@ -85,6 +85,16 @@ class IEncoder
     virtual uint16_t read_raw() const = 0;
 
     virtual void reset() = 0;
+
+    virtual bool has_index() const
+    {
+        return false;
+    }
+
+    virtual uint16_t get_captured_index() const
+    {
+        return 0;
+    }
 };
 
 } // namespace app

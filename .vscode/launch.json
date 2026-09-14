@@ -2,33 +2,54 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug STM32G431",
+      "name": "Debug STM32H523",
       "type": "cortex-debug",
       "request": "launch",
       "servertype": "stlink",
+      "serverpath": "C:/ST/STM32CubeIDE_2.2.0/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.externaltools.stlink-gdb-server.win32_2.2.500.202604010938/tools/bin/ST-LINK_gdbserver.exe",
+      "stm32cubeprog": "C:/Program Files/STMicroelectronics/STM32Cube/STM32CubeProgrammer/bin",
+      "serverArgs": ["-m", "1"],
       "cwd": "${workspaceFolder}",
       "executable": "${workspaceFolder}/build/platform/pmsm_foc_platform.elf",
-      "gdbPath": "C:\\Arm\\13.3 rel1\\bin\\arm-none-eabi-gdb.exe",
+      "gdbPath": "C:/Arm/13.3 rel1/bin/arm-none-eabi-gdb.exe",
       "preLaunchTask": "2. Build Project",
       "runToMain": false,
-      "device": "STM32G431",
-
+      "device": "STM32H523VETx",
       "interface": "swd",
-
       "liveWatch": {
         "enabled": true,
         "samplesPerSecond": 4
       }
-    }
-    ,
+    },
+    {
+      "name": "Debug STM32G431",
+      "type": "cortex-debug",
+      "request": "launch",
+      "servertype": "stlink",
+      "serverpath": "C:/ST/STM32CubeIDE_2.2.0/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.externaltools.stlink-gdb-server.win32_2.2.500.202604010938/tools/bin/ST-LINK_gdbserver.exe",
+      "stm32cubeprog": "C:/Program Files/STMicroelectronics/STM32Cube/STM32CubeProgrammer/bin",
+      "cwd": "${workspaceFolder}",
+      "executable": "${workspaceFolder}/build/platform/pmsm_foc_platform.elf",
+      "gdbPath": "C:/Arm/13.3 rel1/bin/arm-none-eabi-gdb.exe",
+      "preLaunchTask": "2. Build Project",
+      "runToMain": false,
+      "device": "STM32G431",
+      "interface": "swd",
+      "liveWatch": {
+        "enabled": true,
+        "samplesPerSecond": 4
+      }
+    },
     {
       "name": "Debug STM32F767",
       "type": "cortex-debug",
       "request": "launch",
       "servertype": "stlink",
+      "serverpath": "C:/ST/STM32CubeIDE_2.2.0/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.externaltools.stlink-gdb-server.win32_2.2.500.202604010938/tools/bin/ST-LINK_gdbserver.exe",
+      "stm32cubeprog": "C:/Program Files/STMicroelectronics/STM32Cube/STM32CubeProgrammer/bin",
       "cwd": "${workspaceFolder}",
       "executable": "${workspaceFolder}/build/platform/pmsm_foc_platform.elf",
-      "gdbPath": "C:\\Arm\\13.3 rel1\\bin\\arm-none-eabi-gdb.exe",
+      "gdbPath": "C:/Arm/13.3 rel1/bin/arm-none-eabi-gdb.exe",
       "preLaunchTask": "2. Build Project",
       "runToMain": false,
       "device": "STM32F767",

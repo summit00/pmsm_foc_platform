@@ -120,6 +120,7 @@ class ModeManager
         if (mMode != newMode)
         {
             mAutoSetup.reset();
+            mFoc.resetFoc();
             mSpeedLoopCounter = 0;
             mIdRef_A_last = 0.0f;
             mIqRef_A_last = 0.0f;

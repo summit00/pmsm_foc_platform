@@ -24,6 +24,11 @@
       "name": "mIsAbs_mA",
       "type": "float",
       "default": 0.0
+    },
+    {
+      "name": "encoderOffset",
+      "type": "float",
+      "default": 0.0
     }
   ],
   "telemetry": [
@@ -180,6 +185,104 @@
       "scale": 1.0,
       "unit": "",
       "description": "Autosetup sequence state code"
+    },
+    {
+      "id": 23,
+      "name": "drvFault1",
+      "scale": 1.0,
+      "unit": "",
+      "description": "DRV8353 Fault Status 1 Register"
+    },
+    {
+      "id": 24,
+      "name": "drvFault2",
+      "scale": 1.0,
+      "unit": "",
+      "description": "DRV8353 Fault Status 2 Register"
+    },
+    {
+      "id": 25,
+      "name": "drvInitOk",
+      "scale": 1.0,
+      "unit": "",
+      "description": "DRV8353 SPI Init OK (1=Yes, 0=No)"
+    },
+    {
+      "id": 26,
+      "name": "cmdEnable",
+      "scale": 1.0,
+      "unit": "",
+      "description": "Commanded Motor Enable state"
+    },
+    {
+      "id": 27,
+      "name": "cmdMode",
+      "scale": 1.0,
+      "unit": "",
+      "description": "Commanded Mode state"
+    },
+    {
+      "id": 28,
+      "name": "rxPackets",
+      "scale": 1.0,
+      "unit": "",
+      "description": "USB Command Packets Received"
+    },
+    {
+      "id": 29,
+      "name": "driveState",
+      "scale": 1.0,
+      "unit": "",
+      "description": "Drive State (0=PwrOff,1=Init,2=Ready,3=Enabling,4=Enabled,5=Fault)"
+    },
+    {
+      "id": 30,
+      "name": "Rs_ohm",
+      "scale": 1000.0,
+      "unit": "Ohm",
+      "description": "Identified stator phase resistance"
+    },
+    {
+      "id": 31,
+      "name": "Ld_uH",
+      "scale": 1.0,
+      "unit": "uH",
+      "description": "Direct-axis inductance"
+    },
+    {
+      "id": 32,
+      "name": "Lq_uH",
+      "scale": 1.0,
+      "unit": "uH",
+      "description": "Quadrature-axis inductance"
+    },
+    {
+      "id": 33,
+      "name": "flux_pm_mWb",
+      "scale": 100.0,
+      "unit": "mWb",
+      "description": "PM Flux Linkage"
+    },
+    {
+      "id": 34,
+      "name": "encoderOffset",
+      "scale": 1.0,
+      "unit": "ticks",
+      "description": "Calibrated encoder electrical offset"
+    },
+    {
+      "id": 35,
+      "name": "encoderIndex",
+      "scale": 1.0,
+      "unit": "",
+      "description": "Encoder Index Z-pulse captured (1=Yes, 0=No)"
+    },
+    {
+      "id": 36,
+      "name": "encoderTicks",
+      "scale": 1.0,
+      "unit": "ticks",
+      "description": "Encoder raw timer ticks"
     }
   ]
 }

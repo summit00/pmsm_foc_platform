@@ -35,6 +35,30 @@ elseif(TARGET_BOARD STREQUAL "nucleoF767_ihm07")
     STM32F767xx
     USE_HAL_DRIVER
   )
+elseif(TARGET_BOARD STREQUAL "stm32H523_summitLabs")
+  target_include_directories(hal_impl INTERFACE
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/stm32h523
+    ${CMAKE_SOURCE_DIR}/app
+
+    ${CUBE_DIR}/Core/Inc
+    ${CUBE_DIR}/USBX/App
+    ${CUBE_DIR}/USBX/Target
+    ${CUBE_DIR}/Drivers/STM32H5xx_HAL_Driver/Inc
+    ${CUBE_DIR}/Drivers/STM32H5xx_HAL_Driver/Inc/Legacy
+    ${CUBE_DIR}/Drivers/CMSIS/Device/ST/STM32H5xx/Include
+    ${CUBE_DIR}/Drivers/CMSIS/Include
+    ${CUBE_DIR}/Middlewares/ST/usbx/common/core/inc
+    ${CUBE_DIR}/Middlewares/ST/usbx/ports/generic/inc
+    ${CUBE_DIR}/Middlewares/ST/usbx/common/usbx_stm32_device_controllers
+    ${CUBE_DIR}/Middlewares/ST/usbx/common/usbx_device_classes/inc
+  )
+
+  target_compile_definitions(hal_impl INTERFACE
+    STM32H523xx
+    USE_HAL_DRIVER
+    UX_INCLUDE_USER_DEFINE_FILE
+  )
 endif()
 
 target_link_libraries(hal_impl INTERFACE

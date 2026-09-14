@@ -6,5 +6,8 @@
         "editor.formatOnSave": true
     },
     "C_Cpp.clang_format_fallbackStyle": "Google",
-    "C_Cpp.intelliSenseEngine": "default"
+    "C_Cpp.intelliSenseEngine": "default",
+    "cortex-debug.stlinkPath": "C:/ST/STM32CubeIDE_2.2.0/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.externaltools.stlink-gdb-server.win32_2.2.500.202604010938/tools/bin/ST-LINK_gdbserver.exe",
+    "cortex-debug.stm32cubeprog": "C:/Program Files/STMicroelectronics/STM32Cube/STM32CubeProgrammer/bin",
+    "cortex-debug.armToolchainPath": "C:/Arm/13.3 rel1/bin"
 }
