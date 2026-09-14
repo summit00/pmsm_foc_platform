@@ -217,8 +217,10 @@ class App(tk.Tk):
         self._num_plots = 2
 
         # Selected signal IDs per plot (0 -> P1, 1 -> P2, 2 -> P3, 3 -> P4)
+        # Default: Plot 1 -> demandSpeed_rpm (2), feedbackSpeed_rpm (3)
+        #          Plot 2 -> Id_A (7), Iq_A (8)
         self._selected = [
-            {1},      # Plot 1: Udc_V
+            {2, 3},   # Plot 1: demandSpeed_rpm, feedbackSpeed_rpm
             {7, 8},   # Plot 2: Id_A, Iq_A
             set(),    # Plot 3
             set()     # Plot 4
@@ -255,6 +257,8 @@ class App(tk.Tk):
         self._logging_active = False
         self._log_records = []
         self._log_start_time = 0.0
+        self._last_batch_time = 0.0
+        self._log_sample_idx = 0
 
         # Subplot axis management
         self._ax = []
@@ -298,9 +302,11 @@ class App(tk.Tk):
                 self._selected[i] = {vid for vid in self._selected[i] if vid in all_ids}
 
             if not self._selected[0] and self._telemetry_vars:
-                self._selected[0] = {self._telemetry_vars[0]["id"]}
+                default_p1 = {vid for vid in (2, 3) if vid in all_ids}
+                self._selected[0] = default_p1 if default_p1 else {self._telemetry_vars[0]["id"]}
             if not self._selected[1] and len(self._telemetry_vars) > 1:
-                self._selected[1] = {self._telemetry_vars[1]["id"]}
+                default_p2 = {vid for vid in (7, 8) if vid in all_ids}
+                self._selected[1] = default_p2 if default_p2 else {self._telemetry_vars[1]["id"]}
 
             self._current_vals_str.clear()
 
@@ -953,18 +959,28 @@ class App(tk.Tk):
                         if self._tree.exists(str(vid)):
                             self._tree.set(str(vid), "value", val_str)
 
-                # Append to Data Logging buffer if logging is active
-                if self._logging_active:
-                    now = time.time() - self._log_start_time
-                    for s in samples:
-                        # Store timestamp, sample frame, and scaled values
+                # Append to Data Logging buffer if logging is active with continuous interpolated timestamps
+                if self._logging_active and samples:
+                    t_now = time.perf_counter()
+                    dt_batch = t_now - self._last_batch_time
+                    num_samples = len(samples)
+                    t_base = self._last_batch_time - self._log_start_time
+
+                    for i, s in enumerate(samples):
+                        # Calculate exact smooth continuous timestamp for every individual sample in batch
+                        sample_t = max(0.0, t_base + ((i + 1) / num_samples) * dt_batch)
+                        sample_seq = self._log_sample_idx
+                        self._log_sample_idx += 1
+
                         row_vals = []
                         for idx, vid in enumerate(active_ids):
                             if idx < len(s):
                                 row_vals.append(s[idx] / self._telemetry_by_id[vid]["scale"])
                             else:
                                 row_vals.append(0.0)
-                        self._log_records.append((now, total_frames, row_vals))
+                        self._log_records.append((sample_t, sample_seq, row_vals))
+
+                    self._last_batch_time = t_now
 
                     self._log_status_lbl.config(
                         text=f"Log: REC ({len(self._log_records):,} samples)",
@@ -1150,7 +1166,9 @@ class App(tk.Tk):
 
         if self._logging_active:
             self._log_records.clear()
-            self._log_start_time = time.time()
+            self._log_sample_idx = 0
+            self._log_start_time = time.perf_counter()
+            self._last_batch_time = self._log_start_time
             self._log_btn.config(text="⏹ Stop Logging", style="Stop.TButton")
             self._log_status_lbl.config(text="Log: REC (0 samples)", foreground="#f43f5e")
             self._log("Telemetry logging started.")
@@ -1191,7 +1209,7 @@ class App(tk.Tk):
                 # Export recorded log stream if available, otherwise export plot history buffer
                 if self._log_records:
                     for t_rel, seq, vals in self._log_records:
-                        writer.writerow([f"{t_rel:.5f}", seq] + [f"{v:.4f}" for v in vals])
+                        writer.writerow([f"{t_rel:.6f}", seq] + [f"{v:.4f}" for v in vals])
                     row_count = len(self._log_records)
                     self._log(f"Exported {row_count:,} recorded log samples to {os.path.basename(filename)}")
                 else:
@@ -1204,7 +1222,7 @@ class App(tk.Tk):
 
                     for i in range(self.PLOT_WINDOW_POINTS):
                         t_sec = i * time_step
-                        row = [f"{t_sec:.4f}", i]
+                        row = [f"{t_sec:.6f}", i]
                         for col_idx, vid in enumerate(active_ids):
                             scale = self._telemetry_by_id[vid]["scale"]
                             val = view_data[i, col_idx] / scale
