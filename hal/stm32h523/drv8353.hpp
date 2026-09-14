@@ -68,8 +68,8 @@ public:
         IDRIVEP_300MA  = (0x4 << 4),
         IDRIVEP_350MA  = (0x5 << 4),
         IDRIVEP_400MA  = (0x6 << 4),
-        IDRIVEP_450MA  = (0x7 << 4), // Balanced standard setting
-        IDRIVEP_550MA  = (0x8 << 4), // Recommended for fast & efficient switching
+        IDRIVEP_450MA  = (0x7 << 4),
+        IDRIVEP_550MA  = (0x8 << 4),
         IDRIVEP_600MA  = (0x9 << 4),
         IDRIVEP_650MA  = (0xA << 4),
         IDRIVEP_700MA  = (0xB << 4),
@@ -141,7 +141,7 @@ public:
         DT_50NS        = (0b00 << 8), // 50 ns
         DT_100NS       = (0b01 << 8), // 100 ns
         DT_200NS       = (0b10 << 8), // 200 ns
-        DT_400NS       = (0b11 << 8)  // 400 ns (Requested setting)
+        DT_400NS       = (0b11 << 8)  // 400 ns
     };
 
     /**

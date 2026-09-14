@@ -73,17 +73,6 @@ struct MainApp
         MX_ADC1_Init();
         MX_ADC2_Init();
 
-        // Reconfigure ADC1 Dual MultiMode to Injected Simultaneous
-        // (CubeMX default is REGSIMULT_ALTERTRIG, which prevents ADC2 Injected Conversions from triggering)
-        ADC_MultiModeTypeDef multimode{};
-        multimode.Mode = ADC_DUALMODE_INJECSIMULT;
-        multimode.DMAAccessMode = ADC_DMAACCESSMODE_DISABLED;
-        multimode.TwoSamplingDelay = ADC_TWOSAMPLINGDELAY_1CYCLE;
-        if (HAL_ADCEx_MultiModeConfigChannel(&hadc1, &multimode) != HAL_OK)
-        {
-            Error_Handler();
-        }
-
         hal::DwtCycleCounter::enable();
 
         // Initialize DRV8353 gate driver via SPI3 FIRST
@@ -134,8 +123,7 @@ struct MainApp
         // Start QEI Encoder Timer
         platform::init_encoder();
 
-        // Calibrate Current Sense ADC offsets with 4000 live samples
-        // (CSAs are now active and outputting 1.65V / 2048 counts)
+        // Calibrate Current Sense ADC offsets with 4000 live samples.
         platform::calibrate_current_sense();
 
         // Initialize heartbeat status LED
