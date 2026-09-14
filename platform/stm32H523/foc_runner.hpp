@@ -50,14 +50,14 @@ inline app::MotorParams motor_params{.Rs_ohm = 0.2f,
                                      .polePairs = 4.0f,
                                      .encoderOffset_ticks = 88};
 
+constexpr float pwmPeriod_s = 1.0f / 20000.0f;
+
 inline hal::ADCSense adc_sense;
-inline hal::Inverter inverter(htim1);
+inline hal::Inverter inverter(htim1, pwmPeriod_s);
 inline hal::EncoderQEI encoder(htim4, 2000, 4);
 inline app::UserInterface ui;
 
 inline hal::GateDriverEnable gate_enable({bsp::drv_enable().port, bsp::drv_enable().pin});
-
-constexpr float pwmPeriod_s = 1.0f / 20000.0f;
 
 inline app::Control control{
     adc_sense, inverter, gate_enable, encoder, motor_params, ui, pwmPeriod_s};

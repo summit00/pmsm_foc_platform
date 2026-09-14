@@ -236,7 +236,7 @@ public:
     struct Config
     {
         // Driver Control (0x02)
-        PwmMode pwm_mode         = PwmMode::PWM_3X;
+        PwmMode pwm_mode         = PwmMode::PWM_6X;
         bool otw_rep             = false; // Report overtemperature warning on nFAULT
         bool dis_gdf             = false; // Enable gate driver fault detection
         bool dis_cpuv            = false; // Enable charge pump UVLO detection
@@ -252,7 +252,7 @@ public:
         bool cbc                 = false;                  // Latched fault on OCP
 
         // OCP Control (0x05)
-        DeadTime dead_time       = DeadTime::DT_400NS;     // 400 ns dead time
+        DeadTime dead_time       = DeadTime::DT_200NS;     // 200 ns dead time
         OcpMode ocp_mode         = OcpMode::LATCHED_FAULT;
         OcpDeglitch ocp_deg      = OcpDeglitch::DEG_4US;
         VdsLevel vds_level       = VdsLevel::VDS_0_600V;
