@@ -85,7 +85,8 @@ class FOC
         auto [kp, ki] = pi_d.calculatePIGains(mParams.Rs_ohm, mParams.Ld_H, mPwmPeriod_s);
         pi_d.setGains(kp, ki);
         pi_q.setGains(kp, ki);
-        PISpeed.setGains(0.003f, 0.002f);
+        // PISpeed.setGains(0.003f, 0.002f);
+        PISpeed.setGains(0.0114f, 0.0126f);
     }
 
     void setCurrentControlGainsManual(float kp, float ki)
