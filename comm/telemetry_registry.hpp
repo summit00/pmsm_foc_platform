@@ -51,7 +51,9 @@ static constexpr TelemetryRegistryEntry telemetry_registry[] = {
     {"flux_pm_mWb",       33, &::platform::ui.flux_pm_mWb,       100.0f,  "mWb", "PM Flux Linkage"},
     {"encoderOffset",     34, &::platform::ui.encoderOffset_ticks, 1.0f,  "ticks", "Calibrated encoder electrical offset"},
     {"encoderIndex",      35, &::platform::ui.encoderIndexFound,  1.0f,    "",    "Encoder Index Z-pulse captured (1=Yes, 0=No)"},
-    {"encoderTicks",      36, &::platform::ui.encoderRawTicks,    1.0f,    "ticks", "Encoder raw timer ticks"}
+    {"encoderTicks",      36, &::platform::ui.encoderRawTicks,    1.0f,    "ticks", "Encoder raw timer ticks"},
+    {"runtimeTicks",      37, &::platform::ui.runtimeTicks,       1.0f,    "ticks", "FOC ISR execution runtime in CPU cycles/ticks"},
+    {"runtime_us",        38, &::platform::ui.runtime_us,         10.0f,   "us",   "FOC ISR execution time in microseconds"}
 };
 
 static constexpr size_t TELEMETRY_REGISTRY_SIZE = sizeof(telemetry_registry) / sizeof(telemetry_registry[0]);

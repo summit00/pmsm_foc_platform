@@ -9,6 +9,7 @@
 #include "hal/stm32h523/drv8353.hpp"
 #include "inverter.hpp"
 #include "motor_params.hpp"
+#include "runtime_measurement.hpp"
 
 extern "C"
 {
@@ -62,9 +63,18 @@ inline hal::GateDriverEnable gate_enable({bsp::drv_enable().port, bsp::drv_enabl
 inline app::Control control{
     adc_sense, inverter, gate_enable, encoder, motor_params, ui, pwmPeriod_s};
 
+inline hal::DwtCycleCounter cycle_counter;
+inline app::RuntimeMeasurement foc_timer(cycle_counter);
+
 inline void motor_control_isr()
 {
+    foc_timer.start();
     control.run_isr();
+    foc_timer.stop();
+
+    ui.runtimeTicks = static_cast<float>(foc_timer.elapsed_cycles());
+    ui.runtime_us = foc_timer.elapsed_us();
+
     comm::g_telemetry_manager.capture_telemetry_isr();
 }
 

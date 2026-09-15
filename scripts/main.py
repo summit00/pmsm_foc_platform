@@ -43,6 +43,8 @@ except Exception as e:
             {"id": 5, "name": "observerSpeed_rpm", "scale": 1.0, "unit": "rpm", "description": "Observer Estimated Speed"},
             {"id": 7, "name": "Id_A", "scale": 1000.0, "unit": "A", "description": "D-axis feedback current"},
             {"id": 8, "name": "Iq_A", "scale": 1000.0, "unit": "A", "description": "Q-axis feedback current"},
+            {"id": 37, "name": "runtimeTicks", "scale": 1.0, "unit": "ticks", "description": "FOC ISR execution runtime in CPU cycles/ticks"},
+            {"id": 38, "name": "runtime_us", "scale": 10.0, "unit": "us", "description": "FOC ISR execution time in microseconds"},
         ],
     }
 
@@ -329,6 +331,8 @@ class App(tk.Tk):
             {"id": 5, "name": "observerSpeed_rpm", "scale": 1.0, "unit": "rpm", "description": "Observer Speed"},
             {"id": 7, "name": "Id_A", "scale": 1000.0, "unit": "A", "description": "D-axis Current"},
             {"id": 8, "name": "Iq_A", "scale": 1000.0, "unit": "A", "description": "Q-axis Current"},
+            {"id": 37, "name": "runtimeTicks", "scale": 1.0, "unit": "ticks", "description": "FOC ISR execution runtime in CPU cycles/ticks"},
+            {"id": 38, "name": "runtime_us", "scale": 10.0, "unit": "us", "description": "FOC ISR execution time in microseconds"},
         ]
         self._telemetry_by_id = {v["id"]: v for v in self._telemetry_vars}
 
@@ -432,6 +436,13 @@ class App(tk.Tk):
         ttk.Separator(conn, orient="vertical").pack(side="left", fill="y", padx=8, pady=2)
         self._log_status_lbl = ttk.Label(conn, text="Log: IDLE", foreground="#a1a1aa", font=("Segoe UI", 9))
         self._log_status_lbl.pack(side="left", padx=4)
+
+        # Dedicated FOC Runtime field (always visible, in µs)
+        ttk.Separator(conn, orient="vertical").pack(side="left", fill="y", padx=8, pady=2)
+        ttk.Label(conn, text="FOC Runtime:", font=("Segoe UI", 9, "bold"), foreground="#a78bfa").pack(side="left", padx=(4, 2))
+        self._runtime_var = tk.StringVar(value="— µs")
+        self._runtime_lbl = ttk.Label(conn, textvariable=self._runtime_var, font=("Segoe UI", 9, "bold"), foreground="#38bdf8")
+        self._runtime_lbl.pack(side="left", padx=(0, 6))
 
         self._rx_rate_var = tk.StringVar(value="0 Hz")
         ttk.Label(conn, textvariable=self._rx_rate_var, width=10, anchor="e", foreground="#38bdf8").pack(side="right", padx=6)
@@ -578,10 +589,15 @@ class App(tk.Tk):
         self._active_sig_count_lbl.config(text=f"Active MCU Streams: {len(active_ids)} / 10")
 
     def _get_active_telemetry_ids(self):
-        """Returns union of signals selected across all currently active plots."""
+        """Returns union of signals selected across all currently active plots plus always-streamed runtime."""
         active = set()
         for i in range(self._num_plots):
             active |= self._selected[i]
+        # Always include runtime_us (ID 38) or runtimeTicks (ID 37) so it is constantly streamed
+        if 38 in self._telemetry_by_id:
+            active.add(38)
+        elif 37 in self._telemetry_by_id:
+            active.add(37)
         return sorted(list(active))
 
     def _on_tree_click(self, event):
@@ -606,13 +622,17 @@ class App(tk.Tk):
         if vid in self._selected[plot_idx]:
             self._selected[plot_idx].remove(vid)
         else:
-            # Check total active signals across all active plots
+            # Check total active signals across all active plots plus mandatory runtime
             test_union = set()
             for i in range(self._num_plots):
                 if i == plot_idx:
                     test_union |= (self._selected[i] | {vid})
                 else:
                     test_union |= self._selected[i]
+            if 38 in self._telemetry_by_id:
+                test_union.add(38)
+            elif 37 in self._telemetry_by_id:
+                test_union.add(37)
 
             if len(test_union) > 10:
                 self._log("Max 10 active signals stream limit reached across active plots!")
@@ -959,6 +979,12 @@ class App(tk.Tk):
                         if self._tree.exists(str(vid)):
                             self._tree.set(str(vid), "value", val_str)
 
+                # Update dedicated FOC Runtime display in µs
+                if 38 in self._current_vals_str:
+                    self._runtime_var.set(f"{self._current_vals_str[38]} µs")
+                elif 37 in self._current_vals_str:
+                    self._runtime_var.set(f"{self._current_vals_str[37]} ticks")
+
                 # Append to Data Logging buffer if logging is active with continuous interpolated timestamps
                 if self._logging_active and samples:
                     t_now = time.perf_counter()
@@ -1047,6 +1073,7 @@ class App(tk.Tk):
             self._reader = None
             self._conn_btn.config(text="Connect")
             self._status_lbl.config(text="● Disconnected", foreground="#ef4444")
+            self._runtime_var.set("— µs")
         else:
             port = self._port_var.get()
             try:
@@ -1072,6 +1099,7 @@ class App(tk.Tk):
             self._reader.stop()
             self._reader = None
         self._conn_btn.config(text="Connect")
+        self._runtime_var.set("— µs")
 
     def _send_command(self):
         if not self._reader:

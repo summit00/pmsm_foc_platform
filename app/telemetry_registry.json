@@ -24,11 +24,6 @@
       "name": "mIsAbs_mA",
       "type": "float",
       "default": 0.0
-    },
-    {
-      "name": "encoderOffset",
-      "type": "float",
-      "default": 0.0
     }
   ],
   "telemetry": [
@@ -283,6 +278,20 @@
       "scale": 1.0,
       "unit": "ticks",
       "description": "Encoder raw timer ticks"
+    },
+    {
+      "id": 37,
+      "name": "runtimeTicks",
+      "scale": 1.0,
+      "unit": "ticks",
+      "description": "FOC ISR execution runtime in CPU cycles/ticks"
+    },
+    {
+      "id": 38,
+      "name": "runtime_us",
+      "scale": 10.0,
+      "unit": "us",
+      "description": "FOC ISR execution time in microseconds"
     }
   ]
 }

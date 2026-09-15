@@ -56,6 +56,10 @@ struct UserInterface
     // Encoder Diagnostics
     float encoderIndexFound = 0.0f;
     float encoderRawTicks = 0.0f;
+
+    // Runtime Measurement
+    float runtimeTicks = 0.0f;
+    float runtime_us = 0.0f;
 };
 
 } // namespace app
