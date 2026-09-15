@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pinning.hpp"
+#include "powerstage_parameters.hpp"
 
 namespace bsp
 {

@@ -54,6 +54,7 @@ class Control
      * @param motor_params Reference to the motor parameters container.
      * @param ui Reference to the user interface/telemetry container.
      * @param pwmPeriod_s PWM period in seconds.
+     * @param fault_thresholds Hardware safety fault thresholds (from powerstage parameters).
      */
     explicit Control(IADC& adc_sense,
                      IInverter& inverter,
@@ -61,7 +62,8 @@ class Control
                      IEncoder& encoder,
                      MotorParams& motor_params,
                      UserInterface& ui,
-                     float pwmPeriod_s)
+                     float pwmPeriod_s,
+                     const FaultThresholds& fault_thresholds = {})
         : mAdcSense(adc_sense), mInverter(inverter), mGateEnable(gate_enable),
           mMotorParams(motor_params), mUi(ui),
           mOpenLoopSensor(pwmPeriod_s, mOmegaRef_rad_Hz, mMotorEnabled_bool),
@@ -71,7 +73,7 @@ class Control
                          static_cast<float>(motor_params.encoderTicks),
                          motor_params.encoderOffset_ticks),
           mSensorSelector(mOpenLoopSensor, mEncoderSensor), mFoc(motor_params, pwmPeriod_s),
-          mFaultManager(), mSpeedRamp(pwmPeriod_s), mAutoSetup(mMotorParams, pwmPeriod_s),
+          mFaultManager(fault_thresholds), mSpeedRamp(pwmPeriod_s), mAutoSetup(mMotorParams, pwmPeriod_s),
           mDsmHardware(*this), mDsm(mDsmHardware), mModeManager(mFoc, mAutoSetup)
     {
         mUdcBus_V = mAdcSense.read_bus_voltage();
@@ -152,6 +154,24 @@ class Control
     uint8_t getFaultStatus() const
     {
         return mIsErrorrState;
+    }
+
+    /**
+     * @brief Get the configured fault thresholds.
+     * @return Reference to the FaultThresholds struct.
+     */
+    const FaultThresholds& getFaultThresholds() const
+    {
+        return mFaultManager.getThresholds();
+    }
+
+    /**
+     * @brief Update the safety fault thresholds.
+     * @param thresholds New FaultThresholds struct.
+     */
+    void setFaultThresholds(const FaultThresholds& thresholds)
+    {
+        mFaultManager.setThresholds(thresholds);
     }
 
     /**

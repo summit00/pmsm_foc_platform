@@ -5,6 +5,7 @@ add_executable(unit_tests
     svm_test.cpp
     drive_state_machine_test.cpp
     mode_manager_test.cpp
+    fault_manager_test.cpp
 )
 
 target_link_libraries(unit_tests PRIVATE

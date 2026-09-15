@@ -1,4 +1,5 @@
 #pragma once
+#include "powerstage_parameters.hpp"
 #include <cmath>
 #include <cstdint>
 
@@ -7,19 +8,19 @@ namespace hal
 
 struct BoardSensorsConfig
 {
-    float shunt_ohm = 0.33f;
-    float opamp_gain = 1.53f;
-    float adc_vref_V = 3.3f;
-    uint16_t adc_counts_fs = 4095u;
-    uint16_t adc_ia_offset = 2048u;
-    uint16_t adc_ic_offset = 2048u;
+    float shunt_ohm = bsp::powerstage_parameters.shunt_resistor_ohm;
+    float opamp_gain = bsp::powerstage_parameters.current_amp_gain;
+    float adc_vref_V = bsp::powerstage_parameters.adc_vref_V;
+    uint16_t adc_counts_fs = bsp::powerstage_parameters.adc_counts_fs;
+    uint16_t adc_ia_offset = bsp::powerstage_parameters.adc_ia_offset;
+    uint16_t adc_ic_offset = bsp::powerstage_parameters.adc_ic_offset;
 
-    float vbus_r_high = 169000.0f; // R17
-    float vbus_r_low = 9310.0f;    // R18
+    float vbus_r_high = bsp::powerstage_parameters.vbus_r_top_ohm;
+    float vbus_r_low = bsp::powerstage_parameters.vbus_r_bottom_ohm;
 
-    float ntc_r25 = 10000.0f;        // 10K NTC
-    float ntc_beta = 3435.0f;        // Standard for RS 742-8420
-    float ntc_pull_down_r = 4700.0f; // R20
+    float ntc_r25 = bsp::powerstage_parameters.ntc_r25;
+    float ntc_beta = bsp::powerstage_parameters.ntc_beta;
+    float ntc_pull_down_r = bsp::powerstage_parameters.ntc_pull_down_r;
 
     float vbus_scale() const
     {

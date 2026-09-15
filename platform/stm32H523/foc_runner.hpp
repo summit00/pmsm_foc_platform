@@ -31,8 +31,11 @@ inline bool init_gate_driver()
 {
     hal::Drv8353::Config cfg;
     cfg.pwm_mode = hal::Drv8353::PwmMode::PWM_6X;
-    cfg.dead_time = hal::Drv8353::DeadTime::DT_200NS;
-    cfg.csa_gain = hal::Drv8353::CsaGain::GAIN_20_VV;
+    cfg.dead_time = static_cast<hal::Drv8353::DeadTime>(bsp::powerstage_parameters.drv8353_dead_time_reg());
+    cfg.csa_gain = (bsp::powerstage_parameters.current_amp_gain >= 40.0f) ? hal::Drv8353::CsaGain::GAIN_40_VV :
+                   (bsp::powerstage_parameters.current_amp_gain >= 20.0f) ? hal::Drv8353::CsaGain::GAIN_20_VV :
+                   (bsp::powerstage_parameters.current_amp_gain >= 10.0f) ? hal::Drv8353::CsaGain::GAIN_10_VV :
+                                                                           hal::Drv8353::CsaGain::GAIN_5_VV;
     cfg.idrivep_hs = hal::Drv8353::IdriveP::IDRIVEP_550MA;
     cfg.idriven_hs = hal::Drv8353::IdriveN::IDRIVEN_1100MA;
     cfg.idrivep_ls = hal::Drv8353::IdriveP::IDRIVEP_550MA;
@@ -54,14 +57,24 @@ inline app::MotorParams motor_params{.Rs_ohm = 0.2f,
 constexpr float pwmPeriod_s = 1.0f / 20000.0f;
 
 inline hal::ADCSense adc_sense;
-inline hal::Inverter inverter(htim1, pwmPeriod_s);
+inline hal::Inverter inverter(htim1, pwmPeriod_s, bsp::powerstage_parameters.minSamplingWindow_ns, bsp::powerstage_parameters.deadtime_ns);
 inline hal::EncoderQEI encoder(htim4, 2000, 4);
 inline app::UserInterface ui;
 
 inline hal::GateDriverEnable gate_enable({bsp::drv_enable().port, bsp::drv_enable().pin});
 
 inline app::Control control{
-    adc_sense, inverter, gate_enable, encoder, motor_params, ui, pwmPeriod_s};
+    adc_sense,
+    inverter,
+    gate_enable,
+    encoder,
+    motor_params,
+    ui,
+    pwmPeriod_s,
+    {.overcurrent_threshold_A = bsp::powerstage_parameters.max_current_A,
+     .overvoltage_threshold_V = bsp::powerstage_parameters.max_voltage_V,
+     .undervoltage_threshold_V = bsp::powerstage_parameters.min_voltage_V,
+     .overtemp_threshold_C = bsp::powerstage_parameters.max_temperature_C}};
 
 inline hal::DwtCycleCounter cycle_counter;
 inline app::RuntimeMeasurement foc_timer(cycle_counter);

@@ -1,5 +1,6 @@
 #pragma once
 #include "interfaces.hpp"
+#include "powerstage_parameters.hpp"
 #include <algorithm>
 #include <cstdint>
 #include "stm32h5xx_hal.h"
@@ -12,13 +13,13 @@ class Inverter : public app::IInverter
   public:
     explicit Inverter(TIM_HandleTypeDef& htim,
                       float pwmPeriod_s,
-                      float minMeasWindow_ns = 2000.0f,
-                      float minTurnOnTime_ns = 100.0f)
+                      float minMeasWindow_ns = bsp::powerstage_parameters.minSamplingWindow_ns,
+                      float deadtime_ns = bsp::powerstage_parameters.deadtime_ns)
         : htim_(&htim),
           pwmPeriod_s_(pwmPeriod_s),
           minMeasWindow_ns_(minMeasWindow_ns),
-          minTurnOnTime_ns_(minTurnOnTime_ns),
-          minDuty_((minTurnOnTime_ns_ * 1e-9f) / pwmPeriod_s),
+          deadtime_ns_(deadtime_ns),
+          minDuty_((deadtime_ns_ * 1e-9f) / pwmPeriod_s),
           maxDuty_(1.0f - ((minMeasWindow_ns_ * 1e-9f) / pwmPeriod_s))
     {
     }
@@ -62,13 +63,13 @@ class Inverter : public app::IInverter
     float get_min_duty() const { return minDuty_; }
     float get_max_duty() const { return maxDuty_; }
     float get_min_meas_window_ns() const { return minMeasWindow_ns_; }
-    float get_min_turn_on_time_ns() const { return minTurnOnTime_ns_; }
+    float get_deadtime_ns() const { return deadtime_ns_; }
 
   private:
     TIM_HandleTypeDef* htim_;
     float pwmPeriod_s_;
     float minMeasWindow_ns_;
-    float minTurnOnTime_ns_;
+    float deadtime_ns_;
     float minDuty_;
     float maxDuty_;
     bool is_moe_enabled_{false};

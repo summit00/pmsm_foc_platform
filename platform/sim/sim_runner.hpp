@@ -38,7 +38,7 @@ class SimRunner
                           simParams.Ld_H,
                           simParams.Lq_H,
                           simParams.fluxPm_Wb,
-                          simParams.polePairs_count,
+                          static_cast<float>(simParams.polePairs_count),
                           2000,
                           0},
 
@@ -46,7 +46,7 @@ class SimRunner
           mMotor(simParams, mSolver, externalLoad), mLogger(logFilename),
 
           // Initialize Mock Hardware
-          mSimAdc(mMotor), mSimInverter(), mSimEncoder(mMotor, 2000, simParams.polePairs_count),
+          mSimAdc(mMotor), mSimInverter(), mSimEncoder(mMotor, 2000, static_cast<uint16_t>(simParams.polePairs_count)),
           mSimGateEnable(),
 
           // Initialize the actual Controller!
@@ -56,7 +56,8 @@ class SimRunner
                    mSimEncoder,
                    mAppMotorParams,
                    mUi,
-                   1.0f / mCtrlFreq_Hz)
+                   1.0f / mCtrlFreq_Hz,
+                   mFaultThresholds)
     {
     }
 
@@ -134,6 +135,10 @@ class SimRunner
     // App Data
     app::MotorParams mAppMotorParams;
     app::UserInterface mUi;
+    app::FaultThresholds mFaultThresholds{.overcurrent_threshold_A = 10.0f,
+                                          .overvoltage_threshold_V = 48.0f,
+                                          .undervoltage_threshold_V = 10.0f,
+                                          .overtemp_threshold_C = 80.0f};
 
     // Mock Hardware
     SimADC mSimAdc;
